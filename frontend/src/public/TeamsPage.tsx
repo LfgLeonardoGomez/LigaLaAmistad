@@ -56,7 +56,7 @@ export function PublicTeamsPage() {
 
 function TeamCard({ team, zoneName }: { team: Team; zoneName: string }) {
   return (
-    <article className="h-full" style={{ border: '1px solid var(--color-rule)' }}>
+    <article className="card card-hover h-full">
       <Photo team={team} />
 
       <div className="p-4">

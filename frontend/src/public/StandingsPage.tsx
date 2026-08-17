@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 
 import type { Standing, Team, Zone } from '../api/types'
 import { useResource } from '../api/useResource'
-import { Notice, PageTitle } from './parts'
+import { Notice, PageTitle, TeamAvatar } from './parts'
 
 export function PublicStandingsPage() {
   const zones = useResource<Zone[]>('/public/zones')
@@ -90,18 +90,25 @@ export function PublicStandingsPage() {
                         {row.position}
                       </td>
                       <td className="px-2 py-4">
-                        <div className="font-semibold">{team?.player_one_name ?? '—'}</div>
-                        <div style={{ color: 'var(--color-fg-muted)' }}>
-                          {team?.player_two_name ?? ''}
-                        </div>
-                        {team?.status === 'withdrawn' && (
-                          <div
-                            className="mt-1 text-[10px] font-bold tracking-widest uppercase"
-                            style={{ color: 'var(--color-hot)' }}
-                          >
-                            Dada de baja
+                        <div className="flex items-center gap-3">
+                          <TeamAvatar team={team} size={34} />
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold">
+                              {team?.player_one_name ?? '—'}
+                            </div>
+                            <div className="truncate" style={{ color: 'var(--color-fg-muted)' }}>
+                              {team?.player_two_name ?? ''}
+                            </div>
+                            {team?.status === 'withdrawn' && (
+                              <div
+                                className="mt-1 text-[10px] font-bold tracking-widest uppercase"
+                                style={{ color: 'var(--color-hot)' }}
+                              >
+                                Dada de baja
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </td>
                       <Cell>{row.played}</Cell>
                       <Cell>{row.won}</Cell>

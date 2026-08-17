@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 
+import type { Team } from '../api/types'
+
 export function PageTitle({ title, lead }: { title: string; lead?: string }) {
   return (
     <div className="py-[clamp(28px,6vw,56px)]">
@@ -76,6 +78,75 @@ export function Notice({
     >
       {children}
     </p>
+  )
+}
+
+/** The pair's photo, or a striped placeholder while there is none. */
+export function TeamAvatar({ team, size = 28 }: { team: Team | undefined; size?: number }) {
+  const style = { width: size, height: size, border: '1px solid var(--color-rule)' }
+
+  if (team?.photo_url) {
+    return (
+      <img
+        src={team.photo_url}
+        alt=""
+        loading="lazy"
+        className="flex-none rounded-full object-cover"
+        style={style}
+      />
+    )
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      className="flex-none rounded-full"
+      style={{
+        ...style,
+        backgroundImage:
+          'repeating-linear-gradient(45deg, transparent, transparent 4px, var(--color-rule) 4px, var(--color-rule) 5px)',
+      }}
+    />
+  )
+}
+
+export function Pagination({
+  page,
+  pages,
+  onChange,
+}: {
+  page: number
+  pages: number
+  onChange: (page: number) => void
+}) {
+  if (pages <= 1) return null
+
+  const button = (label: ReactNode, target: number, disabled: boolean, current = false) => (
+    <button
+      key={`${label}-${target}`}
+      type="button"
+      onClick={() => onChange(target)}
+      disabled={disabled}
+      aria-current={current ? 'page' : undefined}
+      className="display min-w-9 rounded px-3 py-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+      style={{
+        border: `1px solid ${current ? 'var(--color-accent)' : 'var(--color-rule)'}`,
+        backgroundColor: current ? 'var(--color-accent)' : 'transparent',
+        color: current ? 'var(--color-on-accent)' : 'var(--color-fg-muted)',
+      }}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <nav aria-label="Paginación" className="mt-6 flex flex-wrap items-center justify-center gap-2">
+      {button('Anterior', page - 1, page === 1)}
+      {Array.from({ length: pages }, (_, index) =>
+        button(index + 1, index + 1, false, index + 1 === page),
+      )}
+      {button('Siguiente', page + 1, page === pages)}
+    </nav>
   )
 }
 

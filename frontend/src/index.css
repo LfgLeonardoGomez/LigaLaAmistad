@@ -168,6 +168,37 @@ body {
   margin-inline: var(--hero-inline);
 }
 
+/* Cards share one radius so a page does not mix rounded and square corners.
+   Tables stay square: rounding a data grid only blurs its edges. */
+.card {
+  border: 1px solid var(--color-rule);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* A lift on hover, tinted with the accent rather than plain black, so the
+   glow belongs to whichever palette is active. */
+.card-hover {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+@media (hover: hover) {
+  .card-hover:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-rule));
+    box-shadow: 0 10px 28px -14px color-mix(in srgb, var(--color-accent) 55%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-hover:hover {
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
