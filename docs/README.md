@@ -12,6 +12,7 @@ La idea es usar estos documentos como plano antes de programar: primero entendem
 4. [Backend MVP con FastAPI](./04-backend-mvp-fastapi.md)
 5. [Modelo de datos inicial](./05-modelo-datos.md)
 6. [Modo de trabajo](./06-modo-de-trabajo.md)
+7. [Prompt para la web pública](./07-prompt-web-publica.md)
 
 ## Principios del proyecto
 
