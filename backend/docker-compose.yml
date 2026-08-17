@@ -1,0 +1,26 @@
+# Local Postgres for development. Production runs on Railway.
+#
+#   docker compose up -d
+#   uv run python -m app.seed
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: liga-db
+    environment:
+      POSTGRES_USER: liga
+      POSTGRES_PASSWORD: liga
+      POSTGRES_DB: liga
+    ports:
+      # 5433 on the host: a native Postgres may already hold 5432.
+      - "5433:5432"
+    volumes:
+      - liga-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U liga -d liga"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  liga-db-data:
