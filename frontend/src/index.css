@@ -251,6 +251,62 @@ body {
   background-position: var(--band-position);
 }
 
+/* --- "Season under way" badge ---------------------------------------------
+
+   A slow green breath. Green because it means live, not because of the
+   palette: it stays the same in the three themes so the signal always reads
+   the same way, and it never competes with the accent colour.
+--------------------------------------------------------------------------- */
+:root {
+  --color-live: #34d399;
+}
+
+@keyframes live-breath {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(52 211 153 / 0);
+  }
+  50% {
+    box-shadow: 0 0 14px 1px rgb(52 211 153 / 0.32);
+  }
+}
+
+@keyframes live-dot {
+  0%,
+  100% {
+    opacity: 0.65;
+    box-shadow: 0 0 0 0 rgb(52 211 153 / 0);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 8px 2px rgb(52 211 153 / 0.5);
+  }
+}
+
+.badge-live {
+  /* 4.5s and ease-in-out: slow enough to read as breathing, not blinking. */
+  animation: live-breath 4.5s ease-in-out infinite;
+}
+
+.badge-live__dot {
+  background-color: var(--color-live);
+  animation: live-dot 4.5s ease-in-out infinite;
+}
+
+/* With motion turned off the glow stays, it just stops moving. Removing it
+   entirely would drop the signal for the people who asked for less movement. */
+@media (prefers-reduced-motion: reduce) {
+  .badge-live {
+    animation: none;
+    box-shadow: 0 0 10px 1px rgb(52 211 153 / 0.22);
+  }
+
+  .badge-live__dot {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 /* Cards share one radius so a page does not mix rounded and square corners.
    Tables stay square: rounding a data grid only blurs its edges. */
 .card {

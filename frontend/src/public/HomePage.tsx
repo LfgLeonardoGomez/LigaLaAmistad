@@ -139,14 +139,10 @@ function Hero({
 
       <div className="container-page hero-align py-[clamp(64px,14vw,140px)]">
         <span
-          className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold tracking-widest uppercase backdrop-blur-sm"
+          className="badge-live inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold tracking-widest uppercase backdrop-blur-sm"
           style={{ border: '1px solid var(--color-rule)', color: 'var(--color-accent)' }}
         >
-          <span
-            aria-hidden="true"
-            className="h-1.5 w-1.5 rounded-full"
-            style={{ backgroundColor: 'var(--color-accent)' }}
-          />
+          <span aria-hidden="true" className="badge-live__dot h-1.5 w-1.5 rounded-full" />
           Temporada en curso
         </span>
 
