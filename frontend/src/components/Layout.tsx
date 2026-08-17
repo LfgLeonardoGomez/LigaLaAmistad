@@ -4,11 +4,11 @@ import { useAuth } from '../auth/AuthContext'
 import { Button } from './ui'
 
 const NAV_ITEMS = [
-  { to: '/parejas', label: 'Parejas' },
-  { to: '/partidos', label: 'Partidos' },
-  { to: '/tabla', label: 'Tabla' },
-  { to: '/sponsors', label: 'Sponsors' },
-  { to: '/administradores', label: 'Administradores' },
+  { to: '/admin/parejas', label: 'Parejas' },
+  { to: '/admin/partidos', label: 'Partidos' },
+  { to: '/admin/tabla', label: 'Tabla' },
+  { to: '/admin/sponsors', label: 'Sponsors' },
+  { to: '/admin/administradores', label: 'Administradores' },
 ]
 
 export function Layout() {

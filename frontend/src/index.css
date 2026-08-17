@@ -1,6 +1,18 @@
 @import 'tailwindcss';
 
+/* ---------------------------------------------------------------------------
+   Two palettes, one front end.
+
+   The admin panel keeps its own neutral `ink` scale. Everything below belongs
+   to the public site, where the theme is switchable at runtime.
+
+   Comparing the two designs, only four things actually change between them:
+   colour, display font, hero alignment and the h1 metrics. All four are
+   tokens, so there is one layout and no duplicated markup.
+--------------------------------------------------------------------------- */
+
 @theme {
+  /* Admin panel — neutral, deliberately quiet. */
   --color-ink-50: #f8fafc;
   --color-ink-100: #f1f5f9;
   --color-ink-200: #e2e8f0;
@@ -11,6 +23,70 @@
   --color-ink-700: #334155;
   --color-ink-800: #1e293b;
   --color-ink-900: #0f172a;
+
+  /* Public site — the default values are the Velada theme. Overridden below. */
+  --color-canvas: #0a1024;
+  --color-card: #0f1730;
+  --color-fg: #f4e4c9;
+  --color-fg-muted: #9c9db0;
+  --color-rule: #26304d;
+  --color-accent: #c7a86b;
+  --color-on-accent: #0a1024;
+  --color-hot: #e35d5d;
+
+  --font-display: 'Cinzel', Georgia, serif;
+  --font-body: 'Archivo', system-ui, sans-serif;
+}
+
+/* Velada — navy and gold. The default. */
+:root,
+[data-theme='velada'] {
+  --color-canvas: #0a1024;
+  --color-card: #0f1730;
+  --color-fg: #f4e4c9;
+  --color-fg-muted: #9c9db0;
+  --color-rule: #26304d;
+  --color-accent: #c7a86b;
+  --color-on-accent: #0a1024;
+  /* #c63030 in the original mockup, raised to clear WCAG AA on this canvas:
+     3.48:1 was below the 4.5:1 needed for the small labels it is used on. */
+  --color-hot: #e35d5d;
+
+  --font-display: 'Cinzel', Georgia, serif;
+  --display-weight: 900;
+  --display-leading: 0.92;
+  --display-tracking: 0.01em;
+
+  --hero-align: center;
+  --hero-justify: center;
+  --hero-inline: auto;
+
+  --canvas-glow: radial-gradient(1100px 600px at 70% -10%, rgb(199 168 107 / 0.1), transparent 60%),
+    radial-gradient(700px 500px at 5% 15%, rgb(0 171 165 / 0.1), transparent 60%);
+}
+
+/* Lima — near-black and lime. Flatter, sportier, left aligned. */
+[data-theme='lima'] {
+  --color-canvas: #0c1210;
+  --color-card: #121a17;
+  --color-fg: #f2efe6;
+  --color-fg-muted: #9aa39b;
+  --color-rule: #232e28;
+  --color-accent: #cdf24a;
+  --color-on-accent: #0c1210;
+  --color-hot: #ff6b4a;
+
+  --font-display: 'Archivo Black', system-ui, sans-serif;
+  /* Archivo Black ships a single weight that is already black. */
+  --display-weight: 400;
+  --display-leading: 0.86;
+  --display-tracking: -0.02em;
+
+  --hero-align: left;
+  --hero-justify: flex-start;
+  --hero-inline: 0;
+
+  --canvas-glow: none;
 }
 
 html,
@@ -21,4 +97,44 @@ body,
 
 body {
   @apply bg-ink-100 text-ink-800 antialiased;
+}
+
+/* The public shell paints itself; the admin keeps the light body above. */
+.public-shell {
+  min-height: 100%;
+  background-color: var(--color-canvas);
+  background-image: var(--canvas-glow);
+  color: var(--color-fg);
+  font-family: var(--font-body);
+}
+
+.display {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  line-height: var(--display-leading);
+  letter-spacing: var(--display-tracking);
+  text-transform: uppercase;
+}
+
+/* Hero alignment is a theme decision, so it travels with the tokens. */
+.hero-align {
+  text-align: var(--hero-align);
+}
+
+.hero-row {
+  justify-content: var(--hero-justify);
+}
+
+.hero-measure {
+  margin-inline: var(--hero-inline);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #0c1210; }
+  body { font-family: Archivo, system-ui, sans-serif; color: #f2efe6; -webkit-font-smoothing: antialiased; }
+  * { box-sizing: border-box; }
+  a { color: #cdf24a; text-decoration: none; }
+  a:hover { color: #f2efe6; }
+  th { text-align: left; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#0c1210;background-image:radial-gradient(1100px 600px at 70% -10%, rgba(205,242,74,.10), transparent 60%),radial-gradient(700px 500px at 5% 15%, rgba(255,107,74,.07), transparent 60%);display:flex;flex-direction:column">
+
+  <header style="position:sticky;top:0;z-index:20;background:rgba(12,18,16,.86);backdrop-filter:blur(12px);border-bottom:1px solid rgba(242,239,230,.12)">
+    <div style="max-width:1180px;margin:0 auto;padding:14px clamp(16px,4vw,32px);display:flex;align-items:center;justify-content:space-between;gap:16px">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <div style="width:34px;height:34px;flex:none;border-radius:50%;border:2px solid #cdf24a;display:grid;place-items:center;font-family:'Archivo Black',sans-serif;font-size:14px;color:#cdf24a">LA</div>
+        <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(13px,3.2vw,15px);letter-spacing:.06em;text-transform:uppercase;line-height:1.05">Liga<br>La Amistad</div>
+      </div>
+      <nav style="display:flex;gap:clamp(4px,2vw,10px);overflow-x:auto;scrollbar-width:none">
+        <button type="button" onClick="{{ goHome }}" style="appearance:none;background:none;border:0;cursor:pointer;padding:8px 4px 6px;font-family:'Archivo Black',sans-serif;font-size:clamp(11px,2.7vw,13px);letter-spacing:.08em;text-transform:uppercase;color:#f2efe6;white-space:nowrap">
+          Inicio
+          <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}"><div style="height:3px;background:#cdf24a;margin-top:6px"></div></sc-if>
+        </button>
+        <button type="button" onClick="{{ goTeams }}" style="appearance:none;background:none;border:0;cursor:pointer;padding:8px 4px 6px;font-family:'Archivo Black',sans-serif;font-size:clamp(11px,2.7vw,13px);letter-spacing:.08em;text-transform:uppercase;color:#f2efe6;white-space:nowrap">
+          Parejas
+          <sc-if value="{{ isTeams }}" hint-placeholder-val="{{ false }}"><div style="height:3px;background:#cdf24a;margin-top:6px"></div></sc-if>
+        </button>
+        <button type="button" onClick="{{ goTable }}" style="appearance:none;background:none;border:0;cursor:pointer;padding:8px 4px 6px;font-family:'Archivo Black',sans-serif;font-size:clamp(11px,2.7vw,13px);letter-spacing:.08em;text-transform:uppercase;color:#f2efe6;white-space:nowrap">
+          Tabla
+          <sc-if value="{{ isTable }}" hint-placeholder-val="{{ false }}"><div style="height:3px;background:#cdf24a;margin-top:6px"></div></sc-if>
+        </button>
+        <button type="button" onClick="{{ goResults }}" style="appearance:none;background:none;border:0;cursor:pointer;padding:8px 4px 6px;font-family:'Archivo Black',sans-serif;font-size:clamp(11px,2.7vw,13px);letter-spacing:.08em;text-transform:uppercase;color:#f2efe6;white-space:nowrap">
+          Resultados
+          <sc-if value="{{ isResults }}" hint-placeholder-val="{{ false }}"><div style="height:3px;background:#cdf24a;margin-top:6px"></div></sc-if>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main style="flex:1;width:100%;max-width:1180px;margin:0 auto;padding:0 clamp(16px,4vw,32px) 72px">
+
+    <!-- ================= HOME ================= -->
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+      <section style="animation:fadeUp .5s ease both">
+        <div style="padding:clamp(40px,9vw,84px) 0 clamp(28px,5vw,44px);border-bottom:1px solid rgba(242,239,230,.12)">
+          <div style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(205,242,74,.45);border-radius:999px;padding:6px 14px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#cdf24a">
+            <span style="width:7px;height:7px;border-radius:50%;background:#cdf24a;display:block"></span>
+            Temporada en curso
+          </div>
+          <h1 style="font-family:'Archivo Black',sans-serif;font-size:clamp(46px,13vw,124px);line-height:.86;letter-spacing:-.02em;text-transform:uppercase;margin:22px 0 0;text-wrap:balance">
+            Liga<br>La <span style="color:#cdf24a">Amistad</span>
+          </h1>
+          <p style="max-width:52ch;font-size:clamp(16px,2.2vw,20px);line-height:1.55;color:rgba(242,239,230,.72);margin:24px 0 0;text-wrap:pretty">
+            Pádel de barrio, en serio. Veinte parejas repartidas en dos zonas, todos contra todos, partidos al mejor de tres sets. Cada resultado que se carga mueve la tabla.
+          </p>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:32px">
+            <button type="button" onClick="{{ goTable }}" style="appearance:none;cursor:pointer;border:0;background:#cdf24a;color:#0c1210;font-family:'Archivo Black',sans-serif;font-size:14px;letter-spacing:.06em;text-transform:uppercase;padding:16px 26px;border-radius:4px" style-hover="background:#f2efe6">Ver la tabla</button>
+            <button type="button" onClick="{{ goResults }}" style="appearance:none;cursor:pointer;background:none;color:#f2efe6;border:1px solid rgba(242,239,230,.35);font-family:'Archivo Black',sans-serif;font-size:14px;letter-spacing:.06em;text-transform:uppercase;padding:16px 26px;border-radius:4px" style-hover="border-color:#cdf24a;color:#cdf24a">Últimos resultados</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:rgba(242,239,230,.14);margin-top:clamp(36px,6vw,56px);border:1px solid rgba(242,239,230,.14)">
+            <div style="background:#0c1210;padding:20px 18px">
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(28px,5vw,40px);line-height:1;color:#cdf24a">20</div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(242,239,230,.6);margin-top:8px">Parejas</div>
+            </div>
+            <div style="background:#0c1210;padding:20px 18px">
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(28px,5vw,40px);line-height:1;color:#cdf24a">2</div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(242,239,230,.6);margin-top:8px">Zonas</div>
+            </div>
+            <div style="background:#0c1210;padding:20px 18px">
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(28px,5vw,40px);line-height:1;color:#cdf24a">3</div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(242,239,230,.6);margin-top:8px">Sets, al mejor de</div>
+            </div>
+            <div style="background:#0c1210;padding:20px 18px">
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(28px,5vw,40px);line-height:1;color:#cdf24a">{{ playedCount }}</div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(242,239,230,.6);margin-top:8px">Partidos jugados</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:clamp(36px,6vw,60px) 0;border-bottom:1px solid rgba(242,239,230,.12)">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap">
+            <h2 style="font-family:'Archivo Black',sans-serif;font-size:clamp(24px,4.6vw,38px);text-transform:uppercase;letter-spacing:-.01em;margin:0">Recién jugados</h2>
+            <button type="button" onClick="{{ goResults }}" style="appearance:none;background:none;border:0;cursor:pointer;padding:0;color:#cdf24a;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase" style-hover="color:#f2efe6">Ver todos →</button>
+          </div>
+          <sc-if value="{{ hasResults }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:24px">
+              <sc-for list="{{ recent }}" as="m" hint-placeholder-count="3">
+                <article style="border:1px solid rgba(242,239,230,.14);background:rgba(242,239,230,.03);padding:18px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(242,239,230,.55)">
+                    <span>{{ m.zoneLabel }}</span>
+                    <span>{{ m.dateText }}</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <div style="flex:1;min-width:0;font-size:15px;font-weight:700;line-height:1.3">{{ m.aName }}</div>
+                      <sc-if value="{{ m.aWon }}" hint-placeholder-val="{{ true }}"><span style="flex:none;font-size:10px;font-weight:700;letter-spacing:.1em;color:#0c1210;background:#cdf24a;padding:3px 7px;border-radius:3px">GANÓ</span></sc-if>
+                      <div style="flex:none;font-family:'Archivo Black',sans-serif;font-size:16px;font-variant-numeric:tabular-nums;letter-spacing:.04em">{{ m.aSets }}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <div style="flex:1;min-width:0;font-size:15px;font-weight:700;line-height:1.3">{{ m.bName }}</div>
+                      <sc-if value="{{ m.bWon }}" hint-placeholder-val="{{ false }}"><span style="flex:none;font-size:10px;font-weight:700;letter-spacing:.1em;color:#0c1210;background:#cdf24a;padding:3px 7px;border-radius:3px">GANÓ</span></sc-if>
+                      <div style="flex:none;font-family:'Archivo Black',sans-serif;font-size:16px;font-variant-numeric:tabular-nums;letter-spacing:.04em">{{ m.bSets }}</div>
+                    </div>
+                  </div>
+                </article>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:24px;border:1px dashed rgba(242,239,230,.25);padding:36px 24px;text-align:center">
+              <div style="font-family:'Archivo Black',sans-serif;font-size:18px;text-transform:uppercase">Todavía no se jugó nada</div>
+              <p style="color:rgba(242,239,230,.6);font-size:15px;margin:10px auto 0;max-width:44ch">La liga arranca con la tabla en cero. Cuando se cargue el primer resultado, aparece acá.</p>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="padding:clamp(36px,6vw,60px) 0;border-bottom:1px solid rgba(242,239,230,.12)">
+          <h2 style="font-family:'Archivo Black',sans-serif;font-size:clamp(24px,4.6vw,38px);text-transform:uppercase;margin:0 0 24px">Cómo funciona</h2>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
+            <div style="border-top:3px solid #cdf24a;background:rgba(242,239,230,.03);padding:22px 20px">
+              <div style="font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:.1em;color:#cdf24a">01</div>
+              <h3 style="font-family:'Archivo Black',sans-serif;font-size:19px;text-transform:uppercase;margin:12px 0 8px">Dos zonas</h3>
+              <p style="margin:0;font-size:15px;line-height:1.55;color:rgba(242,239,230,.7)">Diez parejas en la Zona A y diez en la Zona B. Se juega todos contra todos dentro de la zona.</p>
+            </div>
+            <div style="border-top:3px solid #ff6b4a;background:rgba(242,239,230,.03);padding:22px 20px">
+              <div style="font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:.1em;color:#ff6b4a">02</div>
+              <h3 style="font-family:'Archivo Black',sans-serif;font-size:19px;text-transform:uppercase;margin:12px 0 8px">Lo arreglan ustedes</h3>
+              <p style="margin:0;font-size:15px;line-height:1.55;color:rgba(242,239,230,.7)">No hay fechas fijas. Cada pareja coordina su partido y la organización carga el resultado.</p>
+            </div>
+            <div style="border-top:3px solid #cdf24a;background:rgba(242,239,230,.03);padding:22px 20px">
+              <div style="font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:.1em;color:#cdf24a">03</div>
+              <h3 style="font-family:'Archivo Black',sans-serif;font-size:19px;text-transform:uppercase;margin:12px 0 8px">Puntos</h3>
+              <div style="display:flex;flex-direction:column;gap:7px;margin-top:4px;font-size:14px;font-weight:600">
+                <div style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(242,239,230,.1);padding-bottom:6px"><span style="color:rgba(242,239,230,.7)">Ganar 2-0</span><span style="font-family:'Archivo Black',sans-serif;color:#cdf24a">3 pts</span></div>
+                <div style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(242,239,230,.1);padding-bottom:6px"><span style="color:rgba(242,239,230,.7)">Ganar 2-1</span><span style="font-family:'Archivo Black',sans-serif;color:#cdf24a">2 pts</span></div>
+                <div style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(242,239,230,.1);padding-bottom:6px"><span style="color:rgba(242,239,230,.7)">Perder 1-2</span><span style="font-family:'Archivo Black',sans-serif;color:rgba(242,239,230,.8)">1 pt</span></div>
+                <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:rgba(242,239,230,.7)">Perder 0-2</span><span style="font-family:'Archivo Black',sans-serif;color:rgba(242,239,230,.5)">0 pts</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:clamp(36px,6vw,56px) 0">
+          <h2 style="font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:rgba(242,239,230,.5);margin:0 0 20px">Nos acompañan</h2>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
+            <sc-for list="{{ sponsors }}" as="s" hint-placeholder-count="6">
+              <a href="#" target="_blank" rel="noopener noreferrer" style="display:grid;place-items:center;height:88px;border:1px solid rgba(242,239,230,.14);background:repeating-linear-gradient(135deg,rgba(242,239,230,.05) 0 6px,transparent 6px 12px);text-align:center;padding:10px" style-hover="border-color:#cdf24a">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.06em;color:rgba(242,239,230,.6)">{{ s.name }}</span>
+              </a>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+    </sc-if>
+
+    <!-- ================= PAREJAS ================= -->
+    <sc-if value="{{ isTeams }}" hint-placeholder-val="{{ false }}">
+      <section style="animation:fadeUp .4s ease both;padding-top:clamp(32px,6vw,56px)">
+        <h1 style="font-family:'Archivo Black',sans-serif;font-size:clamp(34px,8vw,64px);text-transform:uppercase;line-height:.92;margin:0">Las parejas</h1>
+        <p style="color:rgba(242,239,230,.65);font-size:16px;max-width:48ch;margin:14px 0 0">Veinte parejas, dos zonas. La zona se asigna al inicio y no cambia durante la temporada.</p>
+        <div style="display:flex;gap:8px;margin:28px 0 0;flex-wrap:wrap">
+          <button type="button" onClick="{{ teamsAll }}" style="appearance:none;cursor:pointer;background:rgba(242,239,230,.06);border:1px solid rgba(242,239,230,.2);color:#f2efe6;padding:10px 18px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase" style-hover="border-color:#cdf24a">Todas</button>
+          <button type="button" onClick="{{ teamsA }}" style="appearance:none;cursor:pointer;background:rgba(242,239,230,.06);border:1px solid rgba(242,239,230,.2);color:#f2efe6;padding:10px 18px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase" style-hover="border-color:#cdf24a">Zona A</button>
+          <button type="button" onClick="{{ teamsB }}" style="appearance:none;cursor:pointer;background:rgba(242,239,230,.06);border:1px solid rgba(242,239,230,.2);color:#f2efe6;padding:10px 18px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase" style-hover="border-color:#ff6b4a">Zona B</button>
+          <div style="align-self:center;margin-left:6px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(242,239,230,.5)">{{ teamsFilterLabel }}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:26px">
+          <sc-for list="{{ teams }}" as="t" hint-placeholder-count="8">
+            <article style="border:1px solid rgba(242,239,230,.14);background:rgba(242,239,230,.03)">
+              <div style="aspect-ratio:4/3;display:grid;place-items:center;background:repeating-linear-gradient(135deg,rgba(242,239,230,.06) 0 8px,transparent 8px 16px);border-bottom:1px solid rgba(242,239,230,.12)">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.06em;color:rgba(242,239,230,.45)">foto de la pareja</span>
+              </div>
+              <div style="padding:16px">
+                <div style="display:flex;align-items:center;gap:8px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(242,239,230,.55)">
+                  <span>{{ t.zoneLabel }}</span>
+                  <sc-if value="{{ t.withdrawn }}" hint-placeholder-val="{{ false }}"><span style="border:1px solid rgba(255,107,74,.5);color:#ff6b4a;padding:2px 6px;border-radius:3px;letter-spacing:.1em">Baja</span></sc-if>
+                </div>
+                <div style="font-family:'Archivo Black',sans-serif;font-size:17px;line-height:1.25;margin-top:10px">{{ t.p1 }}</div>
+                <div style="font-family:'Archivo Black',sans-serif;font-size:17px;line-height:1.25;color:rgba(242,239,230,.65)">{{ t.p2 }}</div>
+              </div>
+            </article>
+          </sc-for>
+        </div>
+      </section>
+    </sc-if>
+
+    <!-- ================= TABLA ================= -->
+    <sc-if value="{{ isTable }}" hint-placeholder-val="{{ false }}">
+      <section style="animation:fadeUp .4s ease both;padding-top:clamp(32px,6vw,56px)">
+        <h1 style="font-family:'Archivo Black',sans-serif;font-size:clamp(34px,8vw,64px);text-transform:uppercase;line-height:.92;margin:0">Posiciones</h1>
+        <p style="color:rgba(242,239,230,.65);font-size:16px;max-width:48ch;margin:14px 0 0">Se actualiza automáticamente con cada resultado cargado.</p>
+        <div style="display:flex;gap:8px;margin:28px 0 22px">
+          <button type="button" onClick="{{ tableA }}" style="appearance:none;cursor:pointer;flex:1;background:rgba(242,239,230,.06);border:1px solid rgba(242,239,230,.2);color:#f2efe6;padding:14px;border-radius:4px;font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:.1em;text-transform:uppercase" style-hover="border-color:#cdf24a">
+            Zona A
+            <sc-if value="{{ isZoneA }}" hint-placeholder-val="{{ true }}"><div style="height:3px;background:#cdf24a;margin:8px -14px -14px"></div></sc-if>
+          </button>
+          <button type="button" onClick="{{ tableB }}" style="appearance:none;cursor:pointer;flex:1;background:rgba(242,239,230,.06);border:1px solid rgba(242,239,230,.2);color:#f2efe6;padding:14px;border-radius:4px;font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:.1em;text-transform:uppercase" style-hover="border-color:#ff6b4a">
+            Zona B
+            <sc-if value="{{ isZoneB }}" hint-placeholder-val="{{ false }}"><div style="height:3px;background:#ff6b4a;margin:8px -14px -14px"></div></sc-if>
+          </button>
+        </div>
+        <div style="border:1px solid rgba(242,239,230,.14);background:rgba(242,239,230,.03)">
+          <table style="width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(242,239,230,.18)">
+                <th scope="col" style="padding:12px 6px 12px clamp(10px,2.5vw,16px);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(242,239,230,.55);width:34px">#</th>
+                <th scope="col" style="padding:12px 6px;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(242,239,230,.55)">Pareja</th>
+                <th scope="col" style="padding:12px 4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(242,239,230,.55);text-align:center;width:34px">PJ</th>
+                <th scope="col" style="padding:12px 4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(242,239,230,.55);text-align:center;width:34px">PG</th>
+                <th scope="col" style="padding:12px 4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(242,239,230,.55);text-align:center;width:34px">PP</th>
+                <th scope="col" style="padding:12px 4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(242,239,230,.55);text-align:center;width:44px">DIF</th>
+                <th scope="col" style="padding:12px clamp(10px,2.5vw,16px) 12px 4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#cdf24a;text-align:right;width:46px">PTS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ standings }}" as="r" hint-placeholder-count="10">
+                <tr style="border-bottom:1px solid rgba(242,239,230,.08)">
+                  <td style="padding:14px 6px 14px clamp(10px,2.5vw,16px);font-family:'Archivo Black',sans-serif;font-size:14px;color:rgba(242,239,230,.5)">{{ r.pos }}</td>
+                  <th scope="row" style="padding:12px 6px;font-weight:700;font-size:clamp(13px,3.2vw,15px);line-height:1.3">
+                    <div>{{ r.p1 }}</div>
+                    <div style="color:rgba(242,239,230,.6)">{{ r.p2 }}</div>
+                    <sc-if value="{{ r.withdrawn }}" hint-placeholder-val="{{ false }}"><div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#ff6b4a;margin-top:4px">Dada de baja</div></sc-if>
+                  </th>
+                  <td style="padding:12px 4px;text-align:center;font-size:clamp(12px,3vw,14px);color:rgba(242,239,230,.7)">{{ r.pj }}</td>
+                  <td style="padding:12px 4px;text-align:center;font-size:clamp(12px,3vw,14px);color:rgba(242,239,230,.7)">{{ r.pg }}</td>
+                  <td style="padding:12px 4px;text-align:center;font-size:clamp(12px,3vw,14px);color:rgba(242,239,230,.7)">{{ r.pp }}</td>
+                  <td style="padding:12px 4px;text-align:center;font-size:clamp(12px,3vw,14px);color:rgba(242,239,230,.7)">{{ r.dif }}</td>
+                  <td style="padding:12px clamp(10px,2.5vw,16px) 12px 4px;text-align:right;font-family:'Archivo Black',sans-serif;font-size:clamp(15px,3.6vw,18px);color:#cdf24a">{{ r.pts }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:13px;line-height:1.6;color:rgba(242,239,230,.5);margin:16px 0 0;max-width:60ch">PJ jugados · PG ganados · PP perdidos · DIF diferencia de sets · PTS puntos. El orden lo define la organización con los criterios de desempate de la liga.</p>
+      </section>
+    </sc-if>
+
+    <!-- ================= RESULTADOS ================= -->
+    <sc-if value="{{ isResults }}" hint-placeholder-val="{{ false }}">
+      <section style="animation:fadeUp .4s ease both;padding-top:clamp(32px,6vw,56px)">
+        <h1 style="font-family:'Archivo Black',sans-serif;font-size:clamp(34px,8vw,64px);text-transform:uppercase;line-height:.92;margin:0">Resultados</h1>
+        <p style="color:rgba(242,239,230,.65);font-size:16px;max-width:48ch;margin:14px 0 0">Partidos ya jugados, del más reciente al más viejo.</p>
+        <div style="display:flex;gap:8px;margin:28px 0 24px;flex-wrap:wrap">
+          <button type="button" onClick="{{ resAll }}" style="appearance:none;cursor:pointer;background:rgba(242,239,230,.06);border:1px solid rgba(242,239,230,.2);color:#f2efe6;padding:10px 18px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase" style-hover="border-color:#cdf24a">Todas</button>
+          <button type="button" onClick="{{ resA }}" style="appearance:none;cursor:pointer;background:rgba(242,239,230,.06);border:1px solid rgba(242,239,230,.2);color:#f2efe6;padding:10px 18px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase" style-hover="border-color:#cdf24a">Zona A</button>
+          <button type="button" onClick="{{ resB }}" style="appearance:none;cursor:pointer;background:rgba(242,239,230,.06);border:1px solid rgba(242,239,230,.2);color:#f2efe6;padding:10px 18px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase" style-hover="border-color:#ff6b4a">Zona B</button>
+        </div>
+        <sc-if value="{{ hasResults }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ matches }}" as="m" hint-placeholder-count="6">
+              <article style="border:1px solid rgba(242,239,230,.14);background:rgba(242,239,230,.03);padding:clamp(14px,3vw,20px)">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(242,239,230,.55);border-bottom:1px solid rgba(242,239,230,.1);padding-bottom:12px">
+                  <span>{{ m.zoneLabel }}</span>
+                  <span>{{ m.dateText }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+                  <div style="display:flex;align-items:center;gap:12px">
+                    <div style="flex:none;width:38px;height:38px;border-radius:50%;background:repeating-linear-gradient(135deg,rgba(242,239,230,.12) 0 5px,transparent 5px 10px);border:1px solid rgba(242,239,230,.16)"></div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:clamp(14px,3.4vw,16px);font-weight:700;line-height:1.3">{{ m.aName }}</div>
+                      <sc-if value="{{ m.aWon }}" hint-placeholder-val="{{ true }}"><div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#cdf24a;margin-top:2px">Ganador</div></sc-if>
+                    </div>
+                    <div style="flex:none;display:flex;gap:6px">
+                      <sc-for list="{{ m.aScores }}" as="s" hint-placeholder-count="2">
+                        <div style="width:30px;height:34px;display:grid;place-items:center;border:1px solid rgba(242,239,230,.16);font-family:'Archivo Black',sans-serif;font-size:15px;font-variant-numeric:tabular-nums">{{ s.v }}</div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px">
+                    <div style="flex:none;width:38px;height:38px;border-radius:50%;background:repeating-linear-gradient(135deg,rgba(242,239,230,.12) 0 5px,transparent 5px 10px);border:1px solid rgba(242,239,230,.16)"></div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:clamp(14px,3.4vw,16px);font-weight:700;line-height:1.3">{{ m.bName }}</div>
+                      <sc-if value="{{ m.bWon }}" hint-placeholder-val="{{ false }}"><div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#cdf24a;margin-top:2px">Ganador</div></sc-if>
+                    </div>
+                    <div style="flex:none;display:flex;gap:6px">
+                      <sc-for list="{{ m.bScores }}" as="s" hint-placeholder-count="2">
+                        <div style="width:30px;height:34px;display:grid;place-items:center;border:1px solid rgba(242,239,230,.16);font-family:'Archivo Black',sans-serif;font-size:15px;font-variant-numeric:tabular-nums">{{ s.v }}</div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px dashed rgba(242,239,230,.25);padding:48px 24px;text-align:center">
+            <div style="font-family:'Archivo Black',sans-serif;font-size:20px;text-transform:uppercase">Sin partidos jugados</div>
+            <p style="color:rgba(242,239,230,.6);font-size:15px;margin:12px auto 0;max-width:44ch">Todavía no se cargó ningún resultado. En cuanto se juegue el primer partido, aparece en esta lista.</p>
+          </div>
+        </sc-if>
+      </section>
+    </sc-if>
+
+  </main>
+
+  <footer style="border-top:1px solid rgba(242,239,230,.12);padding:32px clamp(16px,4vw,32px)">
+    <div style="max-width:1180px;margin:0 auto;display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center">
+      <div style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:rgba(242,239,230,.5)">Liga La Amistad · Temporada 2026</div>
+      <div style="font-size:13px;color:rgba(242,239,230,.4)">Pádel amateur · Dos zonas · Al mejor de tres sets</div>
+    </div>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;emptyState&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Estados&quot;}}">
+const TEAMS = [
+  { id: 1, z: 'A', p1: 'Nico Ferrari', p2: 'Tomi Aguirre' },
+  { id: 2, z: 'A', p1: 'Lucas Peralta', p2: 'Fede Rossi' },
+  { id: 3, z: 'A', p1: 'Martín Ibáñez', p2: 'Javi Sosa' },
+  { id: 4, z: 'A', p1: 'Ale Quiroga', p2: 'Dami Vera' },
+  { id: 5, z: 'A', p1: 'Seba Moyano', p2: 'Emi Ledesma' },
+  { id: 6, z: 'A', p1: 'Pablo Zárate', p2: 'Cris Bustos' },
+  { id: 7, z: 'A', p1: 'Gonza Maidana', p2: 'Leo Ojeda' },
+  { id: 8, z: 'A', p1: 'Diego Salvatierra', p2: 'Rama Paz' },
+  { id: 9, z: 'A', p1: 'Fran Cabrera', p2: 'Ivo Núñez' },
+  { id: 10, z: 'A', p1: 'Juanma Ríos', p2: 'Kevin Duarte', w: true },
+  { id: 11, z: 'B', p1: 'Mati Bianchi', p2: 'Santi Correa' },
+  { id: 12, z: 'B', p1: 'Rodri Lencina', p2: 'Bruno Ávila' },
+  { id: 13, z: 'B', p1: 'Cami Herrera', p2: 'Lu Benítez' },
+  { id: 14, z: 'B', p1: 'Nacho Vidal', p2: 'Tobi Almada' },
+  { id: 15, z: 'B', p1: 'Vale Acosta', p2: 'Sol Miranda' },
+  { id: 16, z: 'B', p1: 'Facu Ponce', p2: 'Guille Arce' },
+  { id: 17, z: 'B', p1: 'Marcos Villalba', p2: 'Ariel Godoy' },
+  { id: 18, z: 'B', p1: 'Eze Cardozo', p2: 'Joaco Silva' },
+  { id: 19, z: 'B', p1: 'Dani Frías', p2: 'Nico Barrios' },
+  { id: 20, z: 'B', p1: 'Chino Ayala', p2: 'Beto Muñoz' },
+]
+
+// pos, teamId, pj, pg, pp, difSets, pts — el orden llega ya resuelto por la API
+const STANDINGS = {
+  A: [
+    [1, 1, 9, 8, 1, 13, 24], [2, 2, 9, 7, 2, 9, 22], [3, 3, 9, 6, 3, 6, 19],
+    [4, 4, 9, 5, 4, 2, 17], [5, 5, 9, 5, 4, 1, 16], [6, 6, 9, 4, 5, -1, 14],
+    [7, 7, 9, 3, 6, -4, 12], [8, 8, 9, 2, 7, -8, 9], [9, 9, 9, 2, 7, -9, 8],
+    [10, 10, 5, 2, 3, -2, 7],
+  ],
+  B: [
+    [1, 11, 9, 8, 1, 14, 25], [2, 12, 9, 7, 2, 10, 21], [3, 13, 9, 6, 3, 7, 20],
+    [4, 14, 9, 5, 4, 3, 18], [5, 15, 9, 5, 4, 2, 16], [6, 16, 9, 4, 5, 0, 15],
+    [7, 17, 9, 3, 6, -5, 11], [8, 18, 9, 3, 6, -6, 11], [9, 19, 9, 2, 7, -11, 8],
+    [10, 20, 9, 1, 8, -14, 5],
+  ],
+}
+
+// a, b, fecha, sets [[ga,gb],...], ganador
+const MATCHES = [
+  [1, 4, '2026-08-15', [[6, 3], [7, 6]], 1],
+  [13, 15, '2026-08-14', [[4, 6], [6, 2], [7, 6]], 13],
+  [11, 17, '2026-08-12', [[6, 1], [6, 4]], 11],
+  [2, 6, '2026-08-11', [[6, 4], [3, 6], [7, 5]], 2],
+  [14, 20, '2026-08-09', [[6, 2], [6, 3]], 14],
+  [3, 8, '2026-08-08', [[7, 5], [6, 7], [7, 6]], 3],
+  [12, 19, '2026-08-06', [[6, 0], [6, 2]], 12],
+  [5, 9, '2026-08-05', [[6, 4], [6, 4]], 5],
+  [16, 18, '2026-08-03', [[3, 6], [6, 4], [7, 6]], 16],
+  [7, 10, '2026-08-01', [[6, 2], [6, 1]], 7],
+]
+
+const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+class Component extends DCLogic {
+  state = { page: 'home', zone: 'A', teamsFilter: 'all', resFilter: 'all' }
+
+  byId(id) { return TEAMS.find((t) => t.id === id) }
+  name(id) { const t = this.byId(id); return t ? t.p1 + ' / ' + t.p2 : '—' }
+  zoneLabel(z) { return z === 'A' ? 'Zona A' : 'Zona B' }
+
+  dateText(iso) {
+    const [y, m, d] = iso.split('-').map(Number)
+    return d + ' ' + MONTHS[m - 1]
+  }
+
+  match(raw) {
+    const [a, b, date, sets, winner] = raw
+    const ta = this.byId(a)
+    const setsWonA = sets.filter((s) => s[0] > s[1]).length
+    return {
+      zoneLabel: this.zoneLabel(ta ? ta.z : 'A'),
+      zone: ta ? ta.z : 'A',
+      dateText: this.dateText(date),
+      aName: this.name(a),
+      bName: this.name(b),
+      aWon: winner === a,
+      bWon: winner === b,
+      aSets: setsWonA + '',
+      bSets: (sets.length - setsWonA) + '',
+      aScores: sets.map((s, i) => ({ v: s[0], key: i })),
+      bScores: sets.map((s, i) => ({ v: s[1], key: i })),
+    }
+  }
+
+  renderVals() {
+    const empty = this.props.emptyState === true
+    const p = this.state.page
+    const all = empty ? [] : MATCHES.map((m) => this.match(m))
+    const matches = this.state.resFilter === 'all' ? all : all.filter((m) => m.zone === this.state.resFilter)
+
+    const teamsFilter = this.state.teamsFilter
+    const teams = TEAMS.filter((t) => teamsFilter === 'all' || t.z === teamsFilter).map((t) => ({
+      key: t.id, p1: t.p1, p2: t.p2, zoneLabel: this.zoneLabel(t.z), withdrawn: t.w === true,
+    }))
+
+    const standings = STANDINGS[this.state.zone].map((r) => {
+      const t = this.byId(r[1])
+      const dif = empty ? 0 : r[5]
+      return {
+        key: r[1], pos: r[0], p1: t.p1, p2: t.p2,
+        pj: empty ? 0 : r[2], pg: empty ? 0 : r[3], pp: empty ? 0 : r[4],
+        dif: dif > 0 ? '+' + dif : dif + '',
+        pts: empty ? 0 : r[6],
+        withdrawn: t.w === true && !empty,
+      }
+    })
+
+    return {
+      isHome: p === 'home', isTeams: p === 'teams', isTable: p === 'table', isResults: p === 'results',
+      isZoneA: this.state.zone === 'A', isZoneB: this.state.zone === 'B',
+      goHome: () => this.setState({ page: 'home' }),
+      goTeams: () => this.setState({ page: 'teams' }),
+      goTable: () => this.setState({ page: 'table' }),
+      goResults: () => this.setState({ page: 'results' }),
+      tableA: () => this.setState({ zone: 'A' }),
+      tableB: () => this.setState({ zone: 'B' }),
+      teamsAll: () => this.setState({ teamsFilter: 'all' }),
+      teamsA: () => this.setState({ teamsFilter: 'A' }),
+      teamsB: () => this.setState({ teamsFilter: 'B' }),
+      resAll: () => this.setState({ resFilter: 'all' }),
+      resA: () => this.setState({ resFilter: 'A' }),
+      resB: () => this.setState({ resFilter: 'B' }),
+      teamsFilterLabel: teams.length + ' parejas',
+      teams, standings, matches,
+      recent: all.slice(0, 3),
+      hasResults: all.length > 0,
+      noResults: all.length === 0,
+      playedCount: empty ? 0 : MATCHES.length,
+      sponsors: [
+        { key: 1, name: 'logo sponsor' }, { key: 2, name: 'logo sponsor' },
+        { key: 3, name: 'logo sponsor' }, { key: 4, name: 'logo sponsor' },
+        { key: 5, name: 'logo sponsor' }, { key: 6, name: 'logo sponsor' },
+      ],
+    }
+  }
+}
+
+</script>
+</body>
+</html>

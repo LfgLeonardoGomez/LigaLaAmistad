@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;900&family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700;6..96,900&family=Archivo+Black&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #121212; }
+  body { font-family: Archivo, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  * { box-sizing: border-box; }
+  a { color: inherit; text-decoration: none; }
+  th { text-align: left; }
+</style>
+</helmet>
+
+<section style="padding:48px;display:flex;flex-direction:column;gap:28px">
+  <div style="font-family:Archivo,sans-serif;color:#8b8b8b;font-size:13px;letter-spacing:.16em;text-transform:uppercase">Turno 1 · Home, tres direcciones visuales</div>
+  <div style="display:flex;flex-wrap:nowrap;width:max-content;gap:48px;align-items:flex-start">
+
+    <!-- ============================================ 1a ============================================ -->
+    <div id="1a" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-family:Archivo,sans-serif;font-weight:700;font-size:13px;letter-spacing:.1em;background:#f4e4c9;color:#0a1024;padding:5px 11px;border-radius:4px">1a</div>
+        <div style="font-family:Archivo,sans-serif;color:#c7a86b;font-size:14px;font-weight:600">Noche · dorado sobre azul medianoche, Cinzel</div>
+      </div>
+
+      <div data-screen-label="Home 1a" style="width:1080px;background:#0a1024;background-image:radial-gradient(900px 520px at 78% -8%, rgba(199,168,107,.18), transparent 62%),radial-gradient(620px 460px at 4% 12%, rgba(0,171,165,.10), transparent 62%);color:#f4e4c9;border:1px solid rgba(244,228,201,.14);overflow:hidden">
+
+        <header style="border-bottom:1px solid rgba(244,228,201,.14);padding:16px 44px;display:flex;align-items:center;justify-content:space-between;gap:24px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:38px;height:38px;border-radius:50%;border:2px solid #c7a86b;display:grid;place-items:center;font-family:Cinzel,serif;font-weight:900;font-size:14px;color:#c7a86b">LA</div>
+            <div style="font-family:Cinzel,serif;font-weight:900;font-size:15px;letter-spacing:.1em;text-transform:uppercase;line-height:1.1">Liga<br>La Amistad</div>
+          </div>
+          <nav style="display:flex;gap:26px;font-family:Cinzel,serif;font-weight:900;font-size:13px;letter-spacing:.12em;text-transform:uppercase">
+            <span style="color:#c7a86b">Inicio</span>
+            <span>Parejas</span>
+            <span>Tabla</span>
+            <span>Resultados</span>
+          </nav>
+        </header>
+
+        <div style="padding:76px 44px 56px;text-align:center;border-bottom:1px solid rgba(244,228,201,.14)">
+          <div style="display:inline-flex;align-items:center;gap:9px;border:1px solid rgba(199,168,107,.5);border-radius:999px;padding:7px 16px;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#c7a86b">
+            <span style="width:6px;height:6px;border-radius:50%;background:#c63030;display:block"></span>
+            Temporada en curso
+          </div>
+          <h1 style="font-family:Cinzel,serif;font-weight:900;font-size:104px;line-height:.92;letter-spacing:.01em;text-transform:uppercase;margin:26px 0 0;color:#fff;text-shadow:0 4px 22px rgba(0,0,0,.9),0 0 3px rgba(0,171,165,.7),0 0 8px rgba(255,79,159,.45)">
+            Liga La<br><span style="color:#c7a86b;text-shadow:none">Amistad</span>
+          </h1>
+          <p style="max-width:56ch;margin:26px auto 0;font-size:19px;line-height:1.6;color:rgba(244,228,201,.74);text-wrap:pretty">
+            Pádel de barrio, en serio. Veinte parejas repartidas en dos zonas, todos contra todos, al mejor de tres sets. Cada resultado que se carga mueve la tabla.
+          </p>
+          <div style="display:flex;gap:14px;justify-content:center;margin-top:36px">
+            <div style="background:#c7a86b;color:#0a1024;font-family:Cinzel,serif;font-weight:900;font-size:14px;letter-spacing:.1em;text-transform:uppercase;padding:17px 30px;border-radius:6px">Ver la tabla</div>
+            <div style="border:1px solid rgba(244,228,201,.4);font-family:Cinzel,serif;font-weight:900;font-size:14px;letter-spacing:.1em;text-transform:uppercase;padding:17px 30px;border-radius:6px">Últimos resultados</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(244,228,201,.14);border-bottom:1px solid rgba(244,228,201,.14)">
+          <div style="background:#0a1024;padding:26px 24px;text-align:center">
+            <div style="font-family:Cinzel,serif;font-weight:900;font-size:40px;line-height:1;color:#c7a86b">20</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(244,228,201,.6);margin-top:10px">Parejas</div>
+          </div>
+          <div style="background:#0a1024;padding:26px 24px;text-align:center">
+            <div style="font-family:Cinzel,serif;font-weight:900;font-size:40px;line-height:1;color:#c7a86b">2</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(244,228,201,.6);margin-top:10px">Zonas</div>
+          </div>
+          <div style="background:#0a1024;padding:26px 24px;text-align:center">
+            <div style="font-family:Cinzel,serif;font-weight:900;font-size:40px;line-height:1;color:#c7a86b">3</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(244,228,201,.6);margin-top:10px">Sets, al mejor de</div>
+          </div>
+          <div style="background:#0a1024;padding:26px 24px;text-align:center">
+            <div style="font-family:Cinzel,serif;font-weight:900;font-size:40px;line-height:1;color:#c7a86b">10</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(244,228,201,.6);margin-top:10px">Partidos jugados</div>
+          </div>
+        </div>
+
+        <div style="padding:52px 44px;border-bottom:1px solid rgba(244,228,201,.14)">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:20px">
+            <h2 style="font-family:Cinzel,serif;font-weight:900;font-size:34px;text-transform:uppercase;letter-spacing:.02em;margin:0">Recién jugados</h2>
+            <div style="color:#c7a86b;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">Ver todos →</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:26px">
+            <article style="border:1px solid rgba(244,228,201,.16);background:rgba(244,228,201,.04);padding:20px;border-radius:6px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(244,228,201,.55)"><span>Zona A</span><span>15 ago</span></div>
+              <div style="display:flex;flex-direction:column;gap:11px;margin-top:18px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700">Nico Ferrari / Tomi Aguirre</div>
+                  <span style="font-size:10px;font-weight:700;letter-spacing:.1em;color:#0a1024;background:#c7a86b;padding:3px 7px;border-radius:3px">GANÓ</span>
+                  <div style="font-family:Cinzel,serif;font-weight:900;font-size:17px">2</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700;color:rgba(244,228,201,.72)">Ale Quiroga / Dami Vera</div>
+                  <div style="font-family:Cinzel,serif;font-weight:900;font-size:17px;color:rgba(244,228,201,.72)">0</div>
+                </div>
+              </div>
+            </article>
+            <article style="border:1px solid rgba(244,228,201,.16);background:rgba(244,228,201,.04);padding:20px;border-radius:6px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(244,228,201,.55)"><span>Zona B</span><span>14 ago</span></div>
+              <div style="display:flex;flex-direction:column;gap:11px;margin-top:18px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700">Cami Herrera / Lu Benítez</div>
+                  <span style="font-size:10px;font-weight:700;letter-spacing:.1em;color:#0a1024;background:#c7a86b;padding:3px 7px;border-radius:3px">GANÓ</span>
+                  <div style="font-family:Cinzel,serif;font-weight:900;font-size:17px">2</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700;color:rgba(244,228,201,.72)">Vale Acosta / Sol Miranda</div>
+                  <div style="font-family:Cinzel,serif;font-weight:900;font-size:17px;color:rgba(244,228,201,.72)">1</div>
+                </div>
+              </div>
+            </article>
+            <article style="border:1px solid rgba(244,228,201,.16);background:rgba(244,228,201,.04);padding:20px;border-radius:6px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(244,228,201,.55)"><span>Zona B</span><span>12 ago</span></div>
+              <div style="display:flex;flex-direction:column;gap:11px;margin-top:18px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700">Mati Bianchi / Santi Correa</div>
+                  <span style="font-size:10px;font-weight:700;letter-spacing:.1em;color:#0a1024;background:#c7a86b;padding:3px 7px;border-radius:3px">GANÓ</span>
+                  <div style="font-family:Cinzel,serif;font-weight:900;font-size:17px">2</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700;color:rgba(244,228,201,.72)">Marcos Villalba / Ariel Godoy</div>
+                  <div style="font-family:Cinzel,serif;font-weight:900;font-size:17px;color:rgba(244,228,201,.72)">0</div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div style="padding:52px 44px;border-bottom:1px solid rgba(244,228,201,.14)">
+          <h2 style="font-family:Cinzel,serif;font-weight:900;font-size:34px;text-transform:uppercase;margin:0 0 26px">Cómo funciona</h2>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+            <div style="border-top:3px solid #c7a86b;background:rgba(244,228,201,.04);padding:24px 22px">
+              <div style="font-family:Cinzel,serif;font-weight:900;font-size:13px;letter-spacing:.12em;color:#c7a86b">01</div>
+              <h3 style="font-family:Cinzel,serif;font-weight:900;font-size:19px;text-transform:uppercase;margin:13px 0 9px">Dos zonas</h3>
+              <p style="margin:0;font-size:15px;line-height:1.6;color:rgba(244,228,201,.7)">Diez parejas en la Zona A y diez en la Zona B. Todos contra todos dentro de su zona.</p>
+            </div>
+            <div style="border-top:3px solid #c63030;background:rgba(244,228,201,.04);padding:24px 22px">
+              <div style="font-family:Cinzel,serif;font-weight:900;font-size:13px;letter-spacing:.12em;color:#c63030">02</div>
+              <h3 style="font-family:Cinzel,serif;font-weight:900;font-size:19px;text-transform:uppercase;margin:13px 0 9px">Lo arreglan ustedes</h3>
+              <p style="margin:0;font-size:15px;line-height:1.6;color:rgba(244,228,201,.7)">No hay fechas fijas. Cada pareja coordina su partido y la organización carga el resultado.</p>
+            </div>
+            <div style="border-top:3px solid #c7a86b;background:rgba(244,228,201,.04);padding:24px 22px">
+              <div style="font-family:Cinzel,serif;font-weight:900;font-size:13px;letter-spacing:.12em;color:#c7a86b">03</div>
+              <h3 style="font-family:Cinzel,serif;font-weight:900;font-size:19px;text-transform:uppercase;margin:13px 0 9px">Puntos</h3>
+              <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;font-weight:600">
+                <div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(244,228,201,.12);padding-bottom:7px"><span style="color:rgba(244,228,201,.7)">Ganar 2-0</span><span style="font-family:Cinzel,serif;font-weight:900;color:#c7a86b">3 pts</span></div>
+                <div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(244,228,201,.12);padding-bottom:7px"><span style="color:rgba(244,228,201,.7)">Ganar 2-1</span><span style="font-family:Cinzel,serif;font-weight:900;color:#c7a86b">2 pts</span></div>
+                <div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(244,228,201,.12);padding-bottom:7px"><span style="color:rgba(244,228,201,.7)">Perder 1-2</span><span style="font-family:Cinzel,serif;font-weight:900;color:rgba(244,228,201,.8)">1 pt</span></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:rgba(244,228,201,.7)">Perder 0-2</span><span style="font-family:Cinzel,serif;font-weight:900;color:rgba(244,228,201,.5)">0 pts</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:44px 44px 52px">
+          <h2 style="font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:rgba(244,228,201,.5);margin:0 0 22px;text-align:center">Nos acompañan</h2>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px">
+            <div style="display:grid;place-items:center;height:86px;border:1px solid rgba(244,228,201,.16);background:repeating-linear-gradient(135deg,rgba(244,228,201,.06) 0 6px,transparent 6px 12px);border-radius:6px"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:rgba(244,228,201,.55)">logo sponsor</span></div>
+            <div style="display:grid;place-items:center;height:86px;border:1px solid rgba(244,228,201,.16);background:repeating-linear-gradient(135deg,rgba(244,228,201,.06) 0 6px,transparent 6px 12px);border-radius:6px"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:rgba(244,228,201,.55)">logo sponsor</span></div>
+            <div style="display:grid;place-items:center;height:86px;border:1px solid rgba(244,228,201,.16);background:repeating-linear-gradient(135deg,rgba(244,228,201,.06) 0 6px,transparent 6px 12px);border-radius:6px"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:rgba(244,228,201,.55)">logo sponsor</span></div>
+            <div style="display:grid;place-items:center;height:86px;border:1px solid rgba(244,228,201,.16);background:repeating-linear-gradient(135deg,rgba(244,228,201,.06) 0 6px,transparent 6px 12px);border-radius:6px"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:rgba(244,228,201,.55)">logo sponsor</span></div>
+            <div style="display:grid;place-items:center;height:86px;border:1px solid rgba(244,228,201,.16);background:repeating-linear-gradient(135deg,rgba(244,228,201,.06) 0 6px,transparent 6px 12px);border-radius:6px"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:rgba(244,228,201,.55)">logo sponsor</span></div>
+          </div>
+        </div>
+
+        <footer style="border-top:1px solid rgba(244,228,201,.14);padding:26px 44px;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-family:Cinzel,serif;font-weight:900;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:rgba(244,228,201,.55)">Liga La Amistad · Temporada 2026</div>
+          <div style="font-size:13px;color:rgba(244,228,201,.42)">Pádel amateur · Dos zonas · Al mejor de tres sets</div>
+        </footer>
+      </div>
+    </div>
+
+    <!-- ============================================ 1b ============================================ -->
+    <div id="1b" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-family:Archivo,sans-serif;font-weight:700;font-size:13px;letter-spacing:.1em;background:#f4e4c9;color:#0a1024;padding:5px 11px;border-radius:4px">1b</div>
+        <div style="font-family:Archivo,sans-serif;color:#c7a86b;font-size:14px;font-weight:600">Día · blanco con dorado, mínimo naranja, Bodoni</div>
+      </div>
+
+      <div data-screen-label="Home 1b" style="width:1080px;background:#fdfcf8;color:#1c1a16;border:1px solid #e6e1d5;overflow:hidden">
+
+        <header style="border-bottom:1px solid #e6e1d5;padding:16px 44px;display:flex;align-items:center;justify-content:space-between;gap:24px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:38px;height:38px;border-radius:50%;border:1.5px solid #a8843c;display:grid;place-items:center;font-family:'Bodoni Moda',serif;font-weight:700;font-size:14px;color:#7a5d24">LA</div>
+            <div style="font-family:'Bodoni Moda',serif;font-weight:700;font-size:16px;letter-spacing:.04em;text-transform:uppercase;line-height:1.1">Liga<br>La Amistad</div>
+          </div>
+          <nav style="display:flex;gap:28px;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase">
+            <span style="color:#7a5d24;border-bottom:2px solid #a8843c;padding-bottom:3px">Inicio</span>
+            <span style="color:#6b665c">Parejas</span>
+            <span style="color:#6b665c">Tabla</span>
+            <span style="color:#6b665c">Resultados</span>
+          </nav>
+        </header>
+
+        <div style="padding:76px 44px 56px;border-bottom:1px solid #e6e1d5;background:radial-gradient(760px 420px at 88% 0%, rgba(168,132,60,.10), transparent 65%)">
+          <div style="display:inline-flex;align-items:center;gap:9px;border:1px solid rgba(168,132,60,.45);border-radius:999px;padding:7px 16px;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8f6f2e">
+            <span style="width:6px;height:6px;border-radius:50%;background:#e0641f;display:block"></span>
+            Temporada en curso
+          </div>
+          <h1 style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:108px;line-height:.9;letter-spacing:-.015em;margin:26px 0 0;text-wrap:balance">
+            Liga La<br><span style="color:#a8843c;font-style:italic;font-weight:700">Amistad</span>
+          </h1>
+          <p style="max-width:54ch;margin:26px 0 0;font-size:19px;line-height:1.62;color:#57534a;text-wrap:pretty">
+            Pádel de barrio, en serio. Veinte parejas repartidas en dos zonas, todos contra todos, al mejor de tres sets. Cada resultado que se carga mueve la tabla.
+          </p>
+          <div style="display:flex;gap:14px;margin-top:36px">
+            <div style="background:#1c1a16;color:#fdfcf8;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:17px 30px;border-radius:4px">Ver la tabla</div>
+            <div style="border:1px solid #c8bfa8;color:#1c1a16;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:17px 30px;border-radius:4px">Últimos resultados</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e6e1d5;border-bottom:1px solid #e6e1d5">
+          <div style="background:#fdfcf8;padding:26px 24px">
+            <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:44px;line-height:1;color:#a8843c">20</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#7d776b;margin-top:10px">Parejas</div>
+          </div>
+          <div style="background:#fdfcf8;padding:26px 24px">
+            <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:44px;line-height:1;color:#a8843c">2</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#7d776b;margin-top:10px">Zonas</div>
+          </div>
+          <div style="background:#fdfcf8;padding:26px 24px">
+            <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:44px;line-height:1;color:#a8843c">3</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#7d776b;margin-top:10px">Sets, al mejor de</div>
+          </div>
+          <div style="background:#fdfcf8;padding:26px 24px">
+            <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:44px;line-height:1;color:#a8843c">10</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#7d776b;margin-top:10px">Partidos jugados</div>
+          </div>
+        </div>
+
+        <div style="padding:52px 44px;border-bottom:1px solid #e6e1d5">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:20px">
+            <h2 style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:36px;margin:0;letter-spacing:-.01em">Recién jugados</h2>
+            <div style="color:#8f6f2e;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">Ver todos →</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:26px">
+            <article style="border:1px solid #e6e1d5;background:#fff;padding:20px;border-radius:4px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8b857a"><span>Zona A</span><span>15 ago</span></div>
+              <div style="display:flex;flex-direction:column;gap:11px;margin-top:18px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700">Nico Ferrari / Tomi Aguirre</div>
+                  <span style="font-size:10px;font-weight:700;letter-spacing:.1em;color:#fdfcf8;background:#6f5420;padding:3px 7px;border-radius:3px">GANÓ</span>
+                  <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:19px">2</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700;color:#7d776b">Ale Quiroga / Dami Vera</div>
+                  <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:19px;color:#7d776b">0</div>
+                </div>
+              </div>
+            </article>
+            <article style="border:1px solid #e6e1d5;background:#fff;padding:20px;border-radius:4px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8b857a"><span>Zona B</span><span>14 ago</span></div>
+              <div style="display:flex;flex-direction:column;gap:11px;margin-top:18px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700">Cami Herrera / Lu Benítez</div>
+                  <span style="font-size:10px;font-weight:700;letter-spacing:.1em;color:#fdfcf8;background:#6f5420;padding:3px 7px;border-radius:3px">GANÓ</span>
+                  <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:19px">2</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700;color:#7d776b">Vale Acosta / Sol Miranda</div>
+                  <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:19px;color:#7d776b">1</div>
+                </div>
+              </div>
+            </article>
+            <article style="border:1px solid #e6e1d5;background:#fff;padding:20px;border-radius:4px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8b857a"><span>Zona B</span><span>12 ago</span></div>
+              <div style="display:flex;flex-direction:column;gap:11px;margin-top:18px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700">Mati Bianchi / Santi Correa</div>
+                  <span style="font-size:10px;font-weight:700;letter-spacing:.1em;color:#fdfcf8;background:#6f5420;padding:3px 7px;border-radius:3px">GANÓ</span>
+                  <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:19px">2</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700;color:#7d776b">Marcos Villalba / Ariel Godoy</div>
+                  <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:19px;color:#7d776b">0</div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div style="padding:52px 44px;border-bottom:1px solid #e6e1d5">
+          <h2 style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:36px;margin:0 0 26px;letter-spacing:-.01em">Cómo funciona</h2>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+            <div style="border-top:3px solid #a8843c;background:#fff;padding:24px 22px">
+              <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:14px;letter-spacing:.08em;color:#7a5d24">01</div>
+              <h3 style="font-family:'Bodoni Moda',serif;font-weight:700;font-size:21px;margin:13px 0 9px">Dos zonas</h3>
+              <p style="margin:0;font-size:15px;line-height:1.6;color:#57534a">Diez parejas en la Zona A y diez en la Zona B. Todos contra todos dentro de su zona.</p>
+            </div>
+            <div style="border-top:3px solid #e0641f;background:#fff;padding:24px 22px">
+              <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:14px;letter-spacing:.08em;color:#b34a10">02</div>
+              <h3 style="font-family:'Bodoni Moda',serif;font-weight:700;font-size:21px;margin:13px 0 9px">Lo arreglan ustedes</h3>
+              <p style="margin:0;font-size:15px;line-height:1.6;color:#57534a">No hay fechas fijas. Cada pareja coordina su partido y la organización carga el resultado.</p>
+            </div>
+            <div style="border-top:3px solid #a8843c;background:#fff;padding:24px 22px">
+              <div style="font-family:'Bodoni Moda',serif;font-weight:900;font-size:14px;letter-spacing:.08em;color:#7a5d24">03</div>
+              <h3 style="font-family:'Bodoni Moda',serif;font-weight:700;font-size:21px;margin:13px 0 9px">Puntos</h3>
+              <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;font-weight:600">
+                <div style="display:flex;justify-content:space-between;border-bottom:1px solid #eae5d9;padding-bottom:7px"><span style="color:#57534a">Ganar 2-0</span><span style="font-family:'Bodoni Moda',serif;font-weight:900;color:#7a5d24">3 pts</span></div>
+                <div style="display:flex;justify-content:space-between;border-bottom:1px solid #eae5d9;padding-bottom:7px"><span style="color:#57534a">Ganar 2-1</span><span style="font-family:'Bodoni Moda',serif;font-weight:900;color:#7a5d24">2 pts</span></div>
+                <div style="display:flex;justify-content:space-between;border-bottom:1px solid #eae5d9;padding-bottom:7px"><span style="color:#57534a">Perder 1-2</span><span style="font-family:'Bodoni Moda',serif;font-weight:900;color:#57534a">1 pt</span></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:#57534a">Perder 0-2</span><span style="font-family:'Bodoni Moda',serif;font-weight:900;color:#8b857a">0 pts</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:44px 44px 52px">
+          <h2 style="font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#8b857a;margin:0 0 22px">Nos acompañan</h2>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px">
+            <div style="display:grid;place-items:center;height:86px;border:1px solid #e6e1d5;background:repeating-linear-gradient(135deg,rgba(28,26,22,.045) 0 6px,transparent 6px 12px);border-radius:4px"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#8b857a">logo sponsor</span></div>
+            <div style="display:grid;place-items:center;height:86px;border:1px solid #e6e1d5;background:repeating-linear-gradient(135deg,rgba(28,26,22,.045) 0 6px,transparent 6px 12px);border-radius:4px"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#8b857a">logo sponsor</span></div>
+            <div style="display:grid;place-items:center;height:86px;border:1px solid #e6e1d5;background:repeating-linear-gradient(135deg,rgba(28,26,22,.045) 0 6px,transparent 6px 12px);border-radius:4px"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#8b857a">logo sponsor</span></div>
+            <div style="display:grid;place-items:center;height:86px;border:1px solid #e6e1d5;background:repeating-linear-gradient(135deg,rgba(28,26,22,.045) 0 6px,transparent 6px 12px);border-radius:4px"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#8b857a">logo sponsor</span></div>
+            <div style="display:grid;place-items:center;height:86px;border:1px solid #e6e1d5;background:repeating-linear-gradient(135deg,rgba(28,26,22,.045) 0 6px,transparent 6px 12px);border-radius:4px"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#8b857a">logo sponsor</span></div>
+          </div>
+        </div>
+
+        <footer style="border-top:1px solid #e6e1d5;padding:26px 44px;display:flex;justify-content:space-between;align-items:center;background:#faf8f2">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7d776b">Liga La Amistad · Temporada 2026</div>
+          <div style="font-size:13px;color:#8b857a">Pádel amateur · Dos zonas · Al mejor de tres sets</div>
+        </footer>
+      </div>
+    </div>
+
+    <!-- ============================================ 1c ============================================ -->
+    <div id="1c" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-family:Archivo,sans-serif;font-weight:700;font-size:13px;letter-spacing:.1em;background:#f4e4c9;color:#0a1024;padding:5px 11px;border-radius:4px">1c</div>
+        <div style="font-family:Archivo,sans-serif;color:#c7a86b;font-size:14px;font-weight:600">Cancha · blanco apagado neutro, negro, rojo, mínimo dorado</div>
+      </div>
+
+      <div data-screen-label="Home 1c" style="width:1080px;background:#f0f0ee;color:#131313;border:1px solid #d7d7d3;overflow:hidden">
+
+        <header style="border-bottom:1px solid #d7d7d3;padding:16px 44px;display:flex;align-items:center;justify-content:space-between;gap:24px;background:#f7f7f5">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:38px;height:38px;display:grid;place-items:center;background:#c1121f;color:#fff;font-family:'Archivo Black',sans-serif;font-size:14px">LA</div>
+            <div style="font-family:'Archivo Black',sans-serif;font-size:15px;letter-spacing:.05em;text-transform:uppercase;line-height:1.1">Liga<br>La Amistad</div>
+          </div>
+          <nav style="display:flex;gap:28px;font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:.1em;text-transform:uppercase">
+            <span style="border-bottom:3px solid #c1121f;padding-bottom:4px">Inicio</span>
+            <span style="color:#5c5c58">Parejas</span>
+            <span style="color:#5c5c58">Tabla</span>
+            <span style="color:#5c5c58">Resultados</span>
+          </nav>
+        </header>
+
+        <div style="padding:72px 44px 56px;border-bottom:1px solid #d7d7d3;position:relative">
+          <div style="position:absolute;top:0;right:44px;width:3px;height:120px;background:#c1121f"></div>
+          <div style="display:inline-flex;align-items:center;gap:9px;background:#c1121f;color:#fff;padding:7px 15px;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase">
+            <span style="width:6px;height:6px;border-radius:50%;background:#fff;display:block"></span>
+            Temporada en curso
+          </div>
+          <h1 style="font-family:'Archivo Black',sans-serif;font-size:112px;line-height:.85;letter-spacing:-.03em;text-transform:uppercase;margin:26px 0 0">
+            Liga La<br><span style="color:#c1121f">Amistad</span>
+          </h1>
+          <div style="width:120px;height:2px;background:#a8843c;margin:28px 0 0"></div>
+          <p style="max-width:54ch;margin:24px 0 0;font-size:19px;line-height:1.62;color:#44443f;text-wrap:pretty">
+            Pádel de barrio, en serio. Veinte parejas repartidas en dos zonas, todos contra todos, al mejor de tres sets. Cada resultado que se carga mueve la tabla.
+          </p>
+          <div style="display:flex;gap:14px;margin-top:36px">
+            <div style="background:#c1121f;color:#fff;font-family:'Archivo Black',sans-serif;font-size:14px;letter-spacing:.08em;text-transform:uppercase;padding:17px 30px">Ver la tabla</div>
+            <div style="border:2px solid #131313;color:#131313;font-family:'Archivo Black',sans-serif;font-size:14px;letter-spacing:.08em;text-transform:uppercase;padding:16px 29px">Últimos resultados</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#d7d7d3;border-bottom:1px solid #d7d7d3">
+          <div style="background:#f7f7f5;padding:26px 24px">
+            <div style="font-family:'Archivo Black',sans-serif;font-size:44px;line-height:1">20</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#6a6a65;margin-top:10px">Parejas</div>
+          </div>
+          <div style="background:#f7f7f5;padding:26px 24px">
+            <div style="font-family:'Archivo Black',sans-serif;font-size:44px;line-height:1">2</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#6a6a65;margin-top:10px">Zonas</div>
+          </div>
+          <div style="background:#f7f7f5;padding:26px 24px">
+            <div style="font-family:'Archivo Black',sans-serif;font-size:44px;line-height:1">3</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#6a6a65;margin-top:10px">Sets, al mejor de</div>
+          </div>
+          <div style="background:#f7f7f5;padding:26px 24px">
+            <div style="font-family:'Archivo Black',sans-serif;font-size:44px;line-height:1;color:#c1121f">10</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#6a6a65;margin-top:10px">Partidos jugados</div>
+          </div>
+        </div>
+
+        <div style="padding:52px 44px;border-bottom:1px solid #d7d7d3">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:20px">
+            <h2 style="font-family:'Archivo Black',sans-serif;font-size:36px;text-transform:uppercase;letter-spacing:-.02em;margin:0">Recién jugados</h2>
+            <div style="color:#c1121f;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">Ver todos →</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:26px">
+            <article style="border:1px solid #d7d7d3;background:#f7f7f5;padding:20px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6a6a65"><span>Zona A</span><span>15 ago</span></div>
+              <div style="display:flex;flex-direction:column;gap:11px;margin-top:18px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700">Nico Ferrari / Tomi Aguirre</div>
+                  <span style="font-size:10px;font-weight:700;letter-spacing:.1em;color:#fff;background:#c1121f;padding:3px 7px">GANÓ</span>
+                  <div style="font-family:'Archivo Black',sans-serif;font-size:18px">2</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700;color:#6a6a65">Ale Quiroga / Dami Vera</div>
+                  <div style="font-family:'Archivo Black',sans-serif;font-size:18px;color:#6a6a65">0</div>
+                </div>
+              </div>
+            </article>
+            <article style="border:1px solid #d7d7d3;background:#f7f7f5;padding:20px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6a6a65"><span>Zona B</span><span>14 ago</span></div>
+              <div style="display:flex;flex-direction:column;gap:11px;margin-top:18px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700">Cami Herrera / Lu Benítez</div>
+                  <span style="font-size:10px;font-weight:700;letter-spacing:.1em;color:#fff;background:#c1121f;padding:3px 7px">GANÓ</span>
+                  <div style="font-family:'Archivo Black',sans-serif;font-size:18px">2</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700;color:#6a6a65">Vale Acosta / Sol Miranda</div>
+                  <div style="font-family:'Archivo Black',sans-serif;font-size:18px;color:#6a6a65">1</div>
+                </div>
+              </div>
+            </article>
+            <article style="border:1px solid #d7d7d3;background:#f7f7f5;padding:20px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6a6a65"><span>Zona B</span><span>12 ago</span></div>
+              <div style="display:flex;flex-direction:column;gap:11px;margin-top:18px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700">Mati Bianchi / Santi Correa</div>
+                  <span style="font-size:10px;font-weight:700;letter-spacing:.1em;color:#fff;background:#c1121f;padding:3px 7px">GANÓ</span>
+                  <div style="font-family:'Archivo Black',sans-serif;font-size:18px">2</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-size:15px;font-weight:700;color:#6a6a65">Marcos Villalba / Ariel Godoy</div>
+                  <div style="font-family:'Archivo Black',sans-serif;font-size:18px;color:#6a6a65">0</div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div style="padding:52px 44px;border-bottom:1px solid #d7d7d3">
+          <h2 style="font-family:'Archivo Black',sans-serif;font-size:36px;text-transform:uppercase;letter-spacing:-.02em;margin:0 0 26px">Cómo funciona</h2>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+            <div style="border-top:4px solid #131313;background:#f7f7f5;padding:24px 22px">
+              <div style="font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:.1em;color:#c1121f">01</div>
+              <h3 style="font-family:'Archivo Black',sans-serif;font-size:20px;text-transform:uppercase;margin:13px 0 9px">Dos zonas</h3>
+              <p style="margin:0;font-size:15px;line-height:1.6;color:#44443f">Diez parejas en la Zona A y diez en la Zona B. Todos contra todos dentro de su zona.</p>
+            </div>
+            <div style="border-top:4px solid #c1121f;background:#f7f7f5;padding:24px 22px">
+              <div style="font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:.1em;color:#c1121f">02</div>
+              <h3 style="font-family:'Archivo Black',sans-serif;font-size:20px;text-transform:uppercase;margin:13px 0 9px">Lo arreglan ustedes</h3>
+              <p style="margin:0;font-size:15px;line-height:1.6;color:#44443f">No hay fechas fijas. Cada pareja coordina su partido y la organización carga el resultado.</p>
+            </div>
+            <div style="border-top:4px solid #a8843c;background:#f7f7f5;padding:24px 22px">
+              <div style="font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:.1em;color:#c1121f">03</div>
+              <h3 style="font-family:'Archivo Black',sans-serif;font-size:20px;text-transform:uppercase;margin:13px 0 9px">Puntos</h3>
+              <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;font-weight:600">
+                <div style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e2de;padding-bottom:7px"><span style="color:#44443f">Ganar 2-0</span><span style="font-family:'Archivo Black',sans-serif">3 pts</span></div>
+                <div style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e2de;padding-bottom:7px"><span style="color:#44443f">Ganar 2-1</span><span style="font-family:'Archivo Black',sans-serif">2 pts</span></div>
+                <div style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e2de;padding-bottom:7px"><span style="color:#44443f">Perder 1-2</span><span style="font-family:'Archivo Black',sans-serif;color:#44443f">1 pt</span></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:#44443f">Perder 0-2</span><span style="font-family:'Archivo Black',sans-serif;color:#6a6a65">0 pts</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:44px 44px 52px">
+          <h2 style="font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#6a6a65;margin:0 0 22px">Nos acompañan</h2>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px">
+            <div style="display:grid;place-items:center;height:86px;border:1px solid #d7d7d3;background:repeating-linear-gradient(135deg,rgba(19,19,19,.05) 0 6px,transparent 6px 12px)"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#6a6a65">logo sponsor</span></div>
+            <div style="display:grid;place-items:center;height:86px;border:1px solid #d7d7d3;background:repeating-linear-gradient(135deg,rgba(19,19,19,.05) 0 6px,transparent 6px 12px)"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#6a6a65">logo sponsor</span></div>
+            <div style="display:grid;place-items:center;height:86px;border:1px solid #d7d7d3;background:repeating-linear-gradient(135deg,rgba(19,19,19,.05) 0 6px,transparent 6px 12px)"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#6a6a65">logo sponsor</span></div>
+            <div style="display:grid;place-items:center;height:86px;border:1px solid #d7d7d3;background:repeating-linear-gradient(135deg,rgba(19,19,19,.05) 0 6px,transparent 6px 12px)"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#6a6a65">logo sponsor</span></div>
+            <div style="display:grid;place-items:center;height:86px;border:1px solid #d7d7d3;background:repeating-linear-gradient(135deg,rgba(19,19,19,.05) 0 6px,transparent 6px 12px)"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#6a6a65">logo sponsor</span></div>
+          </div>
+        </div>
+
+        <footer style="border-top:3px solid #131313;padding:26px 44px;display:flex;justify-content:space-between;align-items:center;background:#f7f7f5">
+          <div style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#44443f">Liga La Amistad · Temporada 2026</div>
+          <div style="font-size:13px;color:#6a6a65">Pádel amateur · Dos zonas · Al mejor de tres sets</div>
+        </footer>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+</body>
+</html>

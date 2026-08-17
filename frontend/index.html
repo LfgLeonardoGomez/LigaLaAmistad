@@ -3,7 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Liga La Amistad — Panel</title>
+    <title>Liga La Amistad</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Black&family=Cinzel:wght@500;900&display=swap"
+      rel="stylesheet"
+    />
+
+    <script>
+      // Applied before first paint. Without this the page renders with the
+      // default palette and then snaps to the stored one — a visible flash.
+      try {
+        var stored = localStorage.getItem('liga-theme')
+        document.documentElement.dataset.theme =
+          stored === 'velada' || stored === 'lima' ? stored : 'velada'
+      } catch (error) {
+        document.documentElement.dataset.theme = 'velada'
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
