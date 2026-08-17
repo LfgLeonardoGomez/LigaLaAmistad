@@ -134,7 +134,7 @@ function Hero({
 }) {
   return (
     <section className="photo">
-      <div className="photo__media" style={{ backgroundImage: 'var(--hero-image)' }} />
+      <div className="photo__media" />
       <div className="photo__veil" />
 
       <div className="container-page hero-align py-[clamp(64px,14vw,140px)]">

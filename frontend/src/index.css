@@ -184,12 +184,14 @@ body {
 
 /* --- Photo sections -------------------------------------------------------
 
-   Replace /images/court.svg with a real photo (public/images/hero.jpg) and
-   point these two variables at it. Everything else keeps working.
+   One photo, two crops. The band takes a different slice of the same image so
+   it does not read as a repeat, and there is only one file to keep sharp.
 --------------------------------------------------------------------------- */
 :root {
-  --hero-image: url('/images/court.svg');
-  --band-image: url('/images/court.svg');
+  --hero-image: url('/images/hero.jpg');
+  --hero-position: center 40%;
+  --band-image: url('/images/hero.jpg');
+  --band-position: center 80%;
 }
 
 .photo {
@@ -201,8 +203,9 @@ body {
   position: absolute;
   inset: 0;
   z-index: -2;
+  background-image: var(--hero-image);
   background-size: cover;
-  background-position: center;
+  background-position: var(--hero-position);
 }
 
 /* The veil is what makes the text readable, and it is tinted with the theme's
@@ -245,7 +248,7 @@ body {
   z-index: -2;
   background-image: var(--band-image);
   background-size: cover;
-  background-position: center;
+  background-position: var(--band-position);
 }
 
 /* Cards share one radius so a page does not mix rounded and square corners.

@@ -31,34 +31,34 @@ Railway are genuinely different sites, so the backend must run with
 
 ## Fotos del home
 
-El hero y la banda de scroll usan `public/images/court.svg`, un marcador de
-posición dibujado a mano para que el sitio nunca se vea roto. Para poner fotos
-reales:
-
-1. Dejá los archivos en `public/images/` (por ejemplo `hero.jpg` y `band.jpg`).
-2. Cambiá las dos variables en `src/index.css`:
+El hero y la banda de scroll usan una sola foto, `public/images/hero.jpg`, con
+dos encuadres distintos. Se controla desde cuatro variables en `src/index.css`:
 
 ```css
 :root {
   --hero-image: url('/images/hero.jpg');
-  --band-image: url('/images/band.jpg');
+  --hero-position: center 40%;
+  --band-image: url('/images/hero.jpg');
+  --band-position: center 80%;
 }
 ```
 
-Sobre la foto va un velo teñido con el color de fondo del tema activo, así una
-misma imagen sirve para las tres paletas. Aun así, conviene elegir fotos con la
-zona central despejada: ahí va el texto.
+Sobre la foto va un velo tenido con el color de fondo del tema activo, asi una
+misma imagen sirve para las tres paletas.
 
-Optimizá antes de subirlas. Un JPG de cámara pesa varios MB y es lo primero que
-carga el visitante, casi siempre desde el teléfono. Apuntá a menos de 300 KB y
-un ancho máximo de 1920 px.
+Al elegir una foto nueva:
+
+- **Ancho minimo 1280 px**, mejor 1920. Una imagen de 700 px se estira al doble
+  en un monitor comun y se ve borrosa. Es lo primero que carga el visitante.
+- **Menos de 300 KB.** Casi todos entran desde el telefono.
+- **Centro despejado**, que es donde va el texto.
 
 ### La banda que parece una ventana
 
-La sección `.photo-band` deja la foto quieta mientras el contenido se desliza
-por encima. Está hecha con `clip-path: inset(0)` más un hijo `position: fixed`,
-y **no** con `background-attachment: fixed`, que es más corto pero iOS Safari
-lo ignora — y este sitio se lee sobre todo desde un teléfono.
+La seccion `.photo-band` deja la foto quieta mientras el contenido se desliza
+por encima. Esta hecha con `clip-path: inset(0)` mas un hijo `position: fixed`,
+y **no** con `background-attachment: fixed`, que es mas corto pero iOS Safari
+lo ignora — y este sitio se lee sobre todo desde un telefono.
 
 ## Layout
 
