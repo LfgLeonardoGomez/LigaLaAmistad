@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 export function PageTitle({ title, lead }: { title: string; lead?: string }) {
   return (
     <div className="py-[clamp(28px,6vw,56px)]">
-      <h1 className="display text-[clamp(34px,8vw,72px)]">{title}</h1>
+      <h1 className="display text-[clamp(40px,9vw,86px)]">{title}</h1>
       {lead && (
         <p
           className="mt-3 max-w-[60ch] text-[clamp(15px,2vw,18px)] leading-relaxed text-pretty"
@@ -31,7 +31,7 @@ export function ZoneTabs({
   ]
 
   return (
-    <div role="group" aria-label="Filtrar por zona" className="mb-6 flex flex-wrap gap-2">
+    <div role="group" aria-label="Filtrar por zona" className="flex flex-wrap gap-2">
       {options.map((option) => {
         const active = option.id === selected
         return (
@@ -40,7 +40,7 @@ export function ZoneTabs({
             type="button"
             onClick={() => onSelect(option.id)}
             aria-pressed={active}
-            className="display rounded px-4 py-2 text-xs transition-colors"
+            className="display rounded-full px-5 py-2 text-xs transition-colors"
             style={{
               backgroundColor: active ? 'var(--color-accent)' : 'transparent',
               color: active ? 'var(--color-on-accent)' : 'var(--color-fg-muted)',

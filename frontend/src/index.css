@@ -33,6 +33,8 @@
   --color-accent: #c7a86b;
   --color-on-accent: #0a1024;
   --color-hot: #e35d5d;
+  --color-accent-fill: #c7a86b;
+  --color-on-accent-fill: #0a1024;
 
   --font-display: 'Cinzel', Georgia, serif;
   --font-body: 'Archivo', system-ui, sans-serif;
@@ -51,6 +53,9 @@
   /* #c63030 in the original mockup, raised to clear WCAG AA on this canvas:
      3.48:1 was below the 4.5:1 needed for the small labels it is used on. */
   --color-hot: #e35d5d;
+  /* On the dark themes the accent is already usable as a fill and as text. */
+  --color-accent-fill: #c7a86b;
+  --color-on-accent-fill: #0a1024;
 
   --font-display: 'Cinzel', Georgia, serif;
   --display-weight: 900;
@@ -65,6 +70,38 @@
     radial-gradient(700px 500px at 5% 15%, rgb(0 171 165 / 0.1), transparent 60%);
 }
 
+/* Papel — cream, gold and red. The only light theme.
+   The mockup used #fdfcf8, near pure white. Toned down to a warm cream so a
+   full page of it does not glare.
+
+   Gold cannot be text here: #c7a86b lands at 1.88:1 on this canvas, and even
+   the mockup's darkest gold only reaches 4.16:1. So gold stays a fill colour
+   and a separate, darker gold carries any accented text. */
+[data-theme='papel'] {
+  --color-canvas: #efe9dd;
+  --color-card: #f7f2e8;
+  --color-fg: #1c1a16;
+  --color-fg-muted: #5c5a52;
+  --color-rule: #d8d1c2;
+  --color-accent: #75581f;
+  --color-on-accent: #f7f2e8;
+  --color-hot: #c1121f;
+  /* The gold from the mockup, kept for fills where nothing has to be read. */
+  --color-accent-fill: #c7a86b;
+  --color-on-accent-fill: #1c1a16;
+
+  --font-display: 'Bodoni Moda', Georgia, serif;
+  --display-weight: 700;
+  --display-leading: 0.95;
+  --display-tracking: 0;
+
+  --hero-align: left;
+  --hero-justify: flex-start;
+  --hero-inline: 0;
+
+  --canvas-glow: none;
+}
+
 /* Lima — near-black and lime. Flatter, sportier, left aligned. */
 [data-theme='lima'] {
   --color-canvas: #0c1210;
@@ -75,6 +112,8 @@
   --color-accent: #cdf24a;
   --color-on-accent: #0c1210;
   --color-hot: #ff6b4a;
+  --color-accent-fill: #cdf24a;
+  --color-on-accent-fill: #0c1210;
 
   --font-display: 'Archivo Black', system-ui, sans-serif;
   /* Archivo Black ships a single weight that is already black. */

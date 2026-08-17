@@ -35,3 +35,7 @@ htmlcov/
 # Sistema operativo
 Thumbs.db
 Desktop.ini
+
+# Fotos de prueba: no se versionan (imagenes de personas reales)
+frontend/public/demo/
+docs/__Inspiraci*/*.jpg

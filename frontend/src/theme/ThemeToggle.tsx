@@ -4,9 +4,10 @@ import type { Theme } from './ThemeProvider'
 const LABELS: Record<Theme, string> = {
   velada: 'Clásico',
   lima: 'Neón',
+  papel: 'Papel',
 }
 
-/** A two-option segmented control. With only two palettes, a list beats a menu. */
+/** A segmented control. With three palettes, showing them all still beats a menu. */
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
 

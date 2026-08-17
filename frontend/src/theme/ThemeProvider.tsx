@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 
-export const THEMES = ['velada', 'lima'] as const
+export const THEMES = ['velada', 'lima', 'papel'] as const
 export type Theme = (typeof THEMES)[number]
 
 export const DEFAULT_THEME: Theme = 'velada'
@@ -46,7 +46,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback((next: Theme) => setThemeState(next), [])
   const toggle = useCallback(
-    () => setThemeState((current) => (current === 'velada' ? 'lima' : 'velada')),
+    () =>
+      setThemeState((current) => {
+        const next = THEMES.indexOf(current) + 1
+        return THEMES[next % THEMES.length] ?? DEFAULT_THEME
+      }),
     [],
   )
 

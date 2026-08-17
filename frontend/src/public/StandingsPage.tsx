@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 
 import type { Standing, Team, Zone } from '../api/types'
-import { teamName } from '../api/types'
 import { useResource } from '../api/useResource'
 import { Notice, PageTitle } from './parts'
 
@@ -22,12 +21,9 @@ export function PublicStandingsPage() {
 
   return (
     <>
-      <PageTitle
-        title="Tabla"
-        lead="Se calcula sola con cada resultado que se carga. Ganar 2-0 suma 3 puntos, ganar 2-1 suma 2, y perder 1-2 suma 1."
-      />
+      <PageTitle title="Posiciones" lead="Se actualiza automáticamente con cada resultado cargado." />
 
-      <div role="group" aria-label="Elegir zona" className="mb-6 flex flex-wrap gap-2">
+      <div role="group" aria-label="Elegir zona" className="mb-6 grid gap-3 sm:grid-cols-2">
         {(zones.data ?? []).map((zone) => {
           const active = selected === zone.id
           return (
@@ -36,11 +32,11 @@ export function PublicStandingsPage() {
               type="button"
               onClick={() => setZoneId(zone.id)}
               aria-pressed={active}
-              className="display rounded px-4 py-2 text-xs transition-colors"
+              className="display px-4 py-3.5 text-sm transition-colors"
               style={{
-                backgroundColor: active ? 'var(--color-accent)' : 'transparent',
-                color: active ? 'var(--color-on-accent)' : 'var(--color-fg-muted)',
-                border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-rule)'}`,
+                border: '1px solid var(--color-rule)',
+                borderBottom: `2px solid ${active ? 'var(--color-accent)' : 'var(--color-rule)'}`,
+                color: active ? 'var(--color-fg)' : 'var(--color-fg-muted)',
               }}
             >
               {zone.name}
@@ -50,77 +46,94 @@ export function PublicStandingsPage() {
       </div>
 
       {standings.loading ? (
-        <Notice>Cargando tabla…</Notice>
+        <Notice>Cargando posiciones…</Notice>
       ) : standings.error ? (
         <Notice tone="hot">{standings.error}</Notice>
       ) : !standings.data?.length ? (
         <Notice>Esta zona todavía no tiene parejas.</Notice>
       ) : (
-        <div className="overflow-x-auto" style={{ border: '1px solid var(--color-rule)' }}>
-          <table className="w-full min-w-[520px] text-sm">
-            <caption className="sr-only">
-              Tabla de posiciones, ordenada por puntos, diferencia de sets y diferencia de games
-            </caption>
-            <thead>
-              <tr
-                className="text-[11px] font-semibold tracking-widest uppercase"
-                style={{ color: 'var(--color-fg-muted)', borderBottom: '1px solid var(--color-rule)' }}
-              >
-                <th scope="col" className="w-12 px-3 py-3 text-left">
-                  #
-                </th>
-                <th scope="col" className="px-3 py-3 text-left">
-                  Pareja
-                </th>
-                <th scope="col" className="px-3 py-3 text-center">PJ</th>
-                <th scope="col" className="px-3 py-3 text-center">PG</th>
-                <th scope="col" className="px-3 py-3 text-center">PP</th>
-                <th scope="col" className="px-3 py-3 text-center">Dif. sets</th>
-                <th scope="col" className="px-3 py-3 text-center">Pts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* The order comes from the API: it includes a tie-break cascade
-                  this page does not know about. Never re-sort it here. */}
-              {standings.data.map((row) => {
-                const team = teamsById.get(row.team_id)
-                const podium = row.position <= 3
-                return (
-                  <tr key={row.team_id} style={{ borderTop: '1px solid var(--color-rule)' }}>
-                    <td
-                      className="px-3 py-3 font-semibold tabular-nums"
-                      style={{ color: podium ? 'var(--color-accent)' : 'var(--color-fg-muted)' }}
-                    >
-                      {row.position}
-                    </td>
-                    <td className="px-3 py-3 font-semibold">
-                      {teamName(team)}
-                      {team?.status === 'withdrawn' && (
-                        <span className="ml-2 text-xs font-normal" style={{ color: 'var(--color-fg-muted)' }}>
-                          dada de baja
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-center tabular-nums" style={{ color: 'var(--color-fg-muted)' }}>
-                      {row.played}
-                    </td>
-                    <td className="px-3 py-3 text-center tabular-nums" style={{ color: 'var(--color-fg-muted)' }}>
-                      {row.won}
-                    </td>
-                    <td className="px-3 py-3 text-center tabular-nums" style={{ color: 'var(--color-fg-muted)' }}>
-                      {row.lost}
-                    </td>
-                    <td className="px-3 py-3 text-center tabular-nums" style={{ color: 'var(--color-fg-muted)' }}>
-                      {row.sets_diff > 0 ? `+${row.sets_diff}` : row.sets_diff}
-                    </td>
-                    <td className="px-3 py-3 text-center font-bold tabular-nums">{row.points}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="overflow-x-auto" style={{ border: '1px solid var(--color-rule)' }}>
+            <table className="w-full min-w-[560px] text-sm">
+              <caption className="sr-only">
+                Tabla de posiciones de la zona seleccionada
+              </caption>
+              <thead>
+                <tr
+                  className="text-[11px] font-semibold tracking-widest uppercase"
+                  style={{
+                    color: 'var(--color-fg-muted)',
+                    borderBottom: '1px solid var(--color-rule)',
+                  }}
+                >
+                  <th scope="col" className="w-12 px-4 py-3 text-left">#</th>
+                  <th scope="col" className="px-2 py-3 text-left">Pareja</th>
+                  <th scope="col" className="w-14 px-2 py-3 text-center">PJ</th>
+                  <th scope="col" className="w-14 px-2 py-3 text-center">PG</th>
+                  <th scope="col" className="w-14 px-2 py-3 text-center">PP</th>
+                  <th scope="col" className="w-16 px-2 py-3 text-center">Dif</th>
+                  <th scope="col" className="w-16 px-4 py-3 text-center">Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* The order comes from the API: it carries a tie-break cascade
+                    this page does not know about. Never re-sort it here. */}
+                {standings.data.map((row) => {
+                  const team = teamsById.get(row.team_id)
+                  const podium = row.position <= 3
+                  return (
+                    <tr key={row.team_id} style={{ borderTop: '1px solid var(--color-rule)' }}>
+                      <td
+                        className="display px-4 py-4 text-base"
+                        style={{ color: podium ? 'var(--color-accent)' : 'var(--color-fg-muted)' }}
+                      >
+                        {row.position}
+                      </td>
+                      <td className="px-2 py-4">
+                        <div className="font-semibold">{team?.player_one_name ?? '—'}</div>
+                        <div style={{ color: 'var(--color-fg-muted)' }}>
+                          {team?.player_two_name ?? ''}
+                        </div>
+                        {team?.status === 'withdrawn' && (
+                          <div
+                            className="mt-1 text-[10px] font-bold tracking-widest uppercase"
+                            style={{ color: 'var(--color-hot)' }}
+                          >
+                            Dada de baja
+                          </div>
+                        )}
+                      </td>
+                      <Cell>{row.played}</Cell>
+                      <Cell>{row.won}</Cell>
+                      <Cell>{row.lost}</Cell>
+                      <Cell>{row.sets_diff > 0 ? `+${row.sets_diff}` : row.sets_diff}</Cell>
+                      <td
+                        className="display px-4 py-4 text-center text-lg tabular-nums"
+                        style={{ color: 'var(--color-accent)' }}
+                      >
+                        {row.points}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 space-y-1 text-xs" style={{ color: 'var(--color-fg-muted)' }}>
+            <p>PJ jugados · PG ganados · PP perdidos · Dif diferencia de sets · Pts puntos.</p>
+            <p>El orden lo define la organización con los criterios de desempate de la liga.</p>
+          </div>
+        </>
       )}
     </>
+  )
+}
+
+function Cell({ children }: { children: React.ReactNode }) {
+  return (
+    <td className="px-2 py-4 text-center tabular-nums" style={{ color: 'var(--color-fg-muted)' }}>
+      {children}
+    </td>
   )
 }
