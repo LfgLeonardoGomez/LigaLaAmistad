@@ -20,7 +20,7 @@ export function PublicStandingsPage() {
   )
 
   return (
-    <>
+    <div className="container-page">
       <PageTitle title="Posiciones" lead="Se actualiza automáticamente con cada resultado cargado." />
 
       <div role="group" aria-label="Elegir zona" className="mb-6 grid gap-3 sm:grid-cols-2">
@@ -133,7 +133,7 @@ export function PublicStandingsPage() {
           </div>
         </>
       )}
-    </>
+    </div>
   )
 }
 

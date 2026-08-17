@@ -15,7 +15,7 @@ export function PublicTeamsPage() {
   const count = teams.data?.length ?? 0
 
   return (
-    <>
+    <div className="container-page">
       <PageTitle
         title="Las parejas"
         lead="Dos zonas. La zona se asigna al inicio y no cambia durante la temporada."
@@ -50,7 +50,7 @@ export function PublicTeamsPage() {
           ))}
         </ul>
       )}
-    </>
+    </div>
   )
 }
 

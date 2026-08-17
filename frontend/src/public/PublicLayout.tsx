@@ -64,7 +64,9 @@ export function PublicLayout() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1180px] flex-1 px-4 sm:px-8">
+      {/* Full width on purpose: each page wraps its own content in
+          `.container-page`, which lets a hero or a photo band break out. */}
+      <main className="w-full flex-1">
         <Outlet />
       </main>
 

@@ -31,7 +31,7 @@ export function PublicResultsPage() {
   const visible = newestFirst.slice((page - 1) * PER_PAGE, page * PER_PAGE)
 
   return (
-    <>
+    <div className="container-page">
       <PageTitle title="Resultados" lead="Partidos ya jugados, del más reciente al más viejo." />
 
       <div className="mb-6 flex flex-wrap items-center gap-4">
@@ -69,7 +69,7 @@ export function PublicResultsPage() {
           <Pagination page={page} pages={pages} onChange={setPage} />
         </>
       )}
-    </>
+    </div>
   )
 }
 

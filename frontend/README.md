@@ -29,6 +29,37 @@ The same rule bites in production. The front end on Vercel and the API on
 Railway are genuinely different sites, so the backend must run with
 `COOKIE_SAMESITE=none` and `COOKIE_SECURE=true` there.
 
+## Fotos del home
+
+El hero y la banda de scroll usan `public/images/court.svg`, un marcador de
+posición dibujado a mano para que el sitio nunca se vea roto. Para poner fotos
+reales:
+
+1. Dejá los archivos en `public/images/` (por ejemplo `hero.jpg` y `band.jpg`).
+2. Cambiá las dos variables en `src/index.css`:
+
+```css
+:root {
+  --hero-image: url('/images/hero.jpg');
+  --band-image: url('/images/band.jpg');
+}
+```
+
+Sobre la foto va un velo teñido con el color de fondo del tema activo, así una
+misma imagen sirve para las tres paletas. Aun así, conviene elegir fotos con la
+zona central despejada: ahí va el texto.
+
+Optimizá antes de subirlas. Un JPG de cámara pesa varios MB y es lo primero que
+carga el visitante, casi siempre desde el teléfono. Apuntá a menos de 300 KB y
+un ancho máximo de 1920 px.
+
+### La banda que parece una ventana
+
+La sección `.photo-band` deja la foto quieta mientras el contenido se desliza
+por encima. Está hecha con `clip-path: inset(0)` más un hijo `position: fixed`,
+y **no** con `background-attachment: fixed`, que es más corto pero iOS Safari
+lo ignora — y este sitio se lee sobre todo desde un teléfono.
+
 ## Layout
 
 ```txt

@@ -2,8 +2,8 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 
 import type { Match, Sponsor, Team, Zone } from '../api/types'
-import { teamName } from '../api/types'
 import { useResource } from '../api/useResource'
+import { Notice, TeamAvatar, formatDate } from './parts'
 
 const POINT_RULES = [
   { label: 'Ganar 2-0', value: '3 pts' },
@@ -28,65 +28,9 @@ export function HomePage() {
 
   return (
     <>
-      <section
-        className="hero-align py-[clamp(40px,9vw,84px)]"
-        style={{ borderBottom: '1px solid var(--color-rule)' }}
-      >
-        <span
-          className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold tracking-widest uppercase"
-          style={{ border: '1px solid var(--color-rule)', color: 'var(--color-accent)' }}
-        >
-          <span
-            aria-hidden="true"
-            className="h-1.5 w-1.5 rounded-full"
-            style={{ backgroundColor: 'var(--color-accent)' }}
-          />
-          Temporada en curso
-        </span>
+      <Hero teams={teams.data?.length} zones={zones.data?.length} played={matches.data?.length} />
 
-        <h1 className="display mt-5 text-[clamp(46px,13vw,124px)]">
-          Liga
-          <br />
-          La <span style={{ color: 'var(--color-accent)' }}>Amistad</span>
-        </h1>
-
-        <p
-          className="hero-measure mt-6 max-w-[52ch] text-[clamp(16px,2.2vw,20px)] leading-relaxed text-pretty"
-          style={{ color: 'var(--color-fg-muted)' }}
-        >
-          Pádel de barrio, en serio. Parejas repartidas en dos zonas, todos contra todos,
-          partidos al mejor de tres sets. Cada resultado que se carga mueve la tabla.
-        </p>
-
-        <div className="hero-row mt-8 flex flex-wrap gap-3">
-          <Link
-            to="/tabla"
-            className="display rounded px-5 py-3 text-sm"
-            style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-on-accent)' }}
-          >
-            Ver la tabla
-          </Link>
-          <Link
-            to="/resultados"
-            className="display rounded px-5 py-3 text-sm"
-            style={{ border: '1px solid var(--color-rule)', color: 'var(--color-fg)' }}
-          >
-            Últimos resultados
-          </Link>
-        </div>
-      </section>
-
-      <section
-        className="grid grid-cols-2 sm:grid-cols-4"
-        style={{ border: '1px solid var(--color-rule)', borderTop: 0 }}
-      >
-        <Stat value={teams.data?.length} label="Parejas" />
-        <Stat value={zones.data?.length} label="Zonas" />
-        <Stat value={3} label="Sets, al mejor de" />
-        <Stat value={matches.data?.length} label="Partidos jugados" />
-      </section>
-
-      <section className="py-[clamp(36px,6vw,64px)]">
+      <section className="container-page py-[clamp(36px,6vw,64px)]">
         <div className="mb-6 flex items-baseline justify-between gap-4">
           <h2 className="display text-[clamp(24px,4.5vw,40px)]">Recién jugados</h2>
           <Link
@@ -99,13 +43,13 @@ export function HomePage() {
         </div>
 
         {matches.loading ? (
-          <Placeholder>Cargando resultados…</Placeholder>
+          <Notice>Cargando resultados…</Notice>
         ) : matches.error ? (
-          <Placeholder tone="hot">{matches.error}</Placeholder>
+          <Notice tone="hot">{matches.error}</Notice>
         ) : recent.length === 0 ? (
-          <Placeholder>
+          <Notice>
             Todavía no se jugó ningún partido. Cuando se cargue el primer resultado, aparece acá.
-          </Placeholder>
+          </Notice>
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
             {recent.map((match) => (
@@ -120,7 +64,9 @@ export function HomePage() {
         )}
       </section>
 
-      <section className="py-[clamp(36px,6vw,64px)]">
+      <PhotoBand />
+
+      <section className="container-page py-[clamp(36px,6vw,64px)]">
         <h2 className="display mb-6 text-[clamp(24px,4.5vw,40px)]">Cómo funciona</h2>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -157,7 +103,7 @@ export function HomePage() {
       </section>
 
       {sponsors.data && sponsors.data.length > 0 && (
-        <section className="py-[clamp(28px,5vw,52px)]">
+        <section className="container-page py-[clamp(28px,5vw,52px)]">
           <h2
             className="mb-5 text-xs font-semibold tracking-widest uppercase"
             style={{ color: 'var(--color-fg-muted)' }}
@@ -177,21 +123,127 @@ export function HomePage() {
   )
 }
 
+function Hero({
+  teams,
+  zones,
+  played,
+}: {
+  teams: number | undefined
+  zones: number | undefined
+  played: number | undefined
+}) {
+  return (
+    <section className="photo">
+      <div className="photo__media" style={{ backgroundImage: 'var(--hero-image)' }} />
+      <div className="photo__veil" />
+
+      <div className="container-page hero-align py-[clamp(64px,14vw,140px)]">
+        <span
+          className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold tracking-widest uppercase backdrop-blur-sm"
+          style={{ border: '1px solid var(--color-rule)', color: 'var(--color-accent)' }}
+        >
+          <span
+            aria-hidden="true"
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: 'var(--color-accent)' }}
+          />
+          Temporada en curso
+        </span>
+
+        <h1 className="display mt-5 text-[clamp(46px,13vw,124px)]">
+          Liga
+          <br />
+          La <span style={{ color: 'var(--color-accent)' }}>Amistad</span>
+        </h1>
+
+        <p
+          className="hero-measure mt-6 max-w-[52ch] text-[clamp(16px,2.2vw,20px)] leading-relaxed text-pretty"
+          style={{ color: 'var(--color-fg-muted)' }}
+        >
+          Pádel de barrio, en serio. Parejas repartidas en dos zonas, todos contra todos,
+          partidos al mejor de tres sets. Cada resultado que se carga mueve la tabla.
+        </p>
+
+        <div className="hero-row mt-8 flex flex-wrap gap-3">
+          <Link
+            to="/tabla"
+            className="display rounded px-5 py-3 text-sm"
+            style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-on-accent)' }}
+          >
+            Ver la tabla
+          </Link>
+          <Link
+            to="/resultados"
+            className="display rounded px-5 py-3 text-sm backdrop-blur-sm"
+            style={{ border: '1px solid var(--color-rule)', color: 'var(--color-fg)' }}
+          >
+            Últimos resultados
+          </Link>
+        </div>
+
+        <dl className="hero-row mt-12 flex flex-wrap gap-x-10 gap-y-4">
+          <Stat value={teams} label="Parejas" />
+          <Stat value={zones} label="Zonas" />
+          <Stat value={3} label="Sets, al mejor de" />
+          <Stat value={played} label="Partidos jugados" />
+        </dl>
+      </div>
+    </section>
+  )
+}
+
+/** The photo stays still while this section scrolls over it, like a window. */
+function PhotoBand() {
+  return (
+    <section className="photo-band">
+      <div className="photo-band__media" />
+      <div className="photo__veil" />
+
+      <div className="container-page hero-align py-[clamp(72px,14vw,150px)]">
+        <h2 className="display text-[clamp(28px,6vw,64px)]">
+          Todos contra todos.
+          <br />
+          Cada resultado <span style={{ color: 'var(--color-accent)' }}>mueve la tabla</span>.
+        </h2>
+        <p
+          className="hero-measure mt-5 max-w-[46ch] text-[clamp(15px,2vw,18px)] leading-relaxed"
+          style={{ color: 'var(--color-fg-muted)' }}
+        >
+          No hay fechas fijas. Cada pareja arregla su partido, la organización carga los sets
+          y las posiciones se recalculan solas.
+        </p>
+        <div className="hero-row mt-7 flex">
+          <Link
+            to="/tabla"
+            className="display rounded px-5 py-3 text-sm"
+            style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-on-accent)' }}
+          >
+            Ver las posiciones
+          </Link>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function Stat({ value, label }: { value: number | undefined; label: string }) {
   return (
-    <div
-      className="px-4 py-6 text-center sm:text-left sm:px-6"
-      style={{ borderRight: '1px solid var(--color-rule)' }}
-    >
-      <div className="display text-[clamp(28px,5vw,44px)]" style={{ color: 'var(--color-accent)' }}>
-        {value ?? '—'}
-      </div>
-      <div
-        className="mt-1 text-[11px] font-semibold tracking-widest uppercase"
-        style={{ color: 'var(--color-fg-muted)' }}
-      >
-        {label}
-      </div>
+    <div>
+      <dt className="sr-only">{label}</dt>
+      <dd>
+        <span
+          className="display block text-[clamp(28px,5vw,44px)]"
+          style={{ color: 'var(--color-accent)' }}
+        >
+          {value ?? '—'}
+        </span>
+        <span
+          className="mt-1 block text-[11px] font-semibold tracking-widest uppercase"
+          style={{ color: 'var(--color-fg-muted)' }}
+        >
+          {label}
+        </span>
+      </dd>
     </div>
   )
 }
@@ -218,7 +270,7 @@ function MatchCard({
     ).length
 
   return (
-    <article className="p-4" style={{ border: '1px solid var(--color-rule)' }}>
+    <article className="card card-hover p-4">
       <div
         className="mb-3 flex items-center justify-between text-[11px] font-semibold tracking-widest uppercase"
         style={{ color: 'var(--color-fg-muted)' }}
@@ -231,15 +283,16 @@ function MatchCard({
         const id = index === 0 ? match.team_a_id : match.team_b_id
         const won = match.winner_team_id === id
         return (
-          <div key={id} className="flex items-center justify-between gap-3 py-1">
+          <div key={id} className="flex items-center gap-2.5 py-1">
+            <TeamAvatar team={team} size={24} />
             <span
-              className="truncate text-sm"
+              className="min-w-0 flex-1 truncate text-sm"
               style={{
                 color: won ? 'var(--color-fg)' : 'var(--color-fg-muted)',
                 fontWeight: won ? 600 : 400,
               }}
             >
-              {teamName(team)}
+              {team ? `${team.player_one_name} / ${team.player_two_name}` : '—'}
             </span>
             <span className="flex flex-none items-center gap-2">
               {won && (
@@ -275,7 +328,7 @@ function RuleCard({
 }) {
   const color = accent === 'hot' ? 'var(--color-hot)' : 'var(--color-accent)'
   return (
-    <article className="p-5" style={{ border: '1px solid var(--color-rule)', borderTop: `2px solid ${color}` }}>
+    <article className="card p-5" style={{ borderTop: `2px solid ${color}` }}>
       <div className="text-xs font-bold tracking-widest" style={{ color }}>
         {number}
       </div>
@@ -296,7 +349,7 @@ function SponsorTile({ sponsor }: { sponsor: Sponsor }) {
   )
 
   if (!sponsor.url) {
-    return <div style={{ border: '1px solid var(--color-rule)' }}>{image}</div>
+    return <div className="card">{image}</div>
   }
 
   return (
@@ -304,37 +357,9 @@ function SponsorTile({ sponsor }: { sponsor: Sponsor }) {
       href={sponsor.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="block transition-opacity hover:opacity-80"
-      style={{ border: '1px solid var(--color-rule)' }}
+      className="card card-hover block"
     >
       {image}
     </a>
   )
-}
-
-function Placeholder({
-  children,
-  tone = 'muted',
-}: {
-  children: React.ReactNode
-  tone?: 'muted' | 'hot'
-}) {
-  return (
-    <p
-      className="px-4 py-10 text-center text-sm"
-      style={{
-        border: '1px solid var(--color-rule)',
-        color: tone === 'hot' ? 'var(--color-hot)' : 'var(--color-fg-muted)',
-      }}
-    >
-      {children}
-    </p>
-  )
-}
-
-function formatDate(value: string): string {
-  const [year, month, day] = value.split('-').map(Number)
-  if (!year || !month || !day) return value
-  const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-  return `${day} ${MONTHS[month - 1]}`
 }
