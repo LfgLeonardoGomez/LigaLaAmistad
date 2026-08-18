@@ -60,6 +60,57 @@ por encima. Esta hecha con `clip-path: inset(0)` mas un hijo `position: fixed`,
 y **no** con `background-attachment: fixed`, que es mas corto pero iOS Safari
 lo ignora — y este sitio se lee sobre todo desde un telefono.
 
+## Deploy en Vercel
+
+En Vercel, **New Project** -> importar el repo. Como el repo tiene backend y
+frontend juntos, hay una sola cosa que Vercel no adivina:
+
+| Campo | Valor |
+|---|---|
+| **Root Directory** | `frontend` |
+| Framework Preset | Vite (lo detecta solo) |
+| Build Command | `npm run build` (por defecto) |
+| Output Directory | `dist` (por defecto) |
+
+### Variable de entorno
+
+| Variable | Valor |
+|---|---|
+| `VITE_API_URL` | La URL publica de la API en Railway, sin barra final |
+
+Se lee en tiempo de **build**, no de ejecucion: si la cambias, hay que
+redesplegar para que tome efecto.
+
+### El rewrite no es opcional
+
+`vercel.json` manda todas las rutas desconocidas a `index.html`. Sin eso, el
+ruteo del lado del cliente funciona mientras navegas, pero entrar directo a
+`/tabla` o recargar la pagina devuelve 404. Medido sobre el build real:
+
+```txt
+ruta            sin rewrite  con rewrite
+/                       200          200
+/parejas                404          200
+/tabla                  404          200
+/resultados             404          200
+/admin                  404          200
+```
+
+### Despues del primer deploy
+
+Vercel te da un dominio. Hay que volver a Railway y ajustar tres variables,
+o la sesion del panel no va a funcionar:
+
+```txt
+CORS_ORIGINS=https://tu-dominio.vercel.app
+COOKIE_SAMESITE=none
+COOKIE_SECURE=true
+```
+
+Vercel y Railway son sitios distintos, asi que la cookie de sesion viaja
+cross-site. Con `lax` el navegador la descarta en silencio: el login responde
+200 y todo lo que sigue responde 401.
+
 ## Layout
 
 ```txt
