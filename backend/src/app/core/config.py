@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     cloudinary_api_key: str = ""
     cloudinary_api_secret: str = ""
 
+    # Where each kind of image lands in the Cloudinary media library. They must
+    # match the folders that exist in the account, or Cloudinary creates them.
+    cloudinary_teams_folder: str = "parejas-liga-la-amistad"
+    cloudinary_sponsors_folder: str = "sponsors-liga-la-amistad"
+
     @field_validator("secret_key")
     @classmethod
     def _reject_weak_secret(cls, value: str) -> str:

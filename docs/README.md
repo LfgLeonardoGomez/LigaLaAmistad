@@ -13,6 +13,7 @@ La idea es usar estos documentos como plano antes de programar: primero entendem
 5. [Modelo de datos inicial](./05-modelo-datos.md)
 6. [Modo de trabajo](./06-modo-de-trabajo.md)
 7. [Prompt para la web pública](./07-prompt-web-publica.md)
+8. [Pendientes](./08-pendientes.md)
 
 ## Principios del proyecto
 

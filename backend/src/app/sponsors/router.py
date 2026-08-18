@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, UploadFile, status
 
 from app.auth.deps import get_current_admin
+from app.core.config import settings
 from app.core.images import upload_image
 from app.database.session import SessionDep
 from app.sponsors import service
@@ -32,9 +33,8 @@ def update_sponsor(sponsor_id: int, data: SponsorUpdate, session: SessionDep):
 def upload_sponsor_logo(sponsor_id: int, file: UploadFile, session: SessionDep):
     """Upload the sponsor's logo. Not `async`: the Cloudinary call blocks."""
     service.get_sponsor(session, sponsor_id)  # 404 before spending an upload
-    return service.set_logo_url(
-        session, sponsor_id, upload_image(file, folder="sponsors")
-    )
+    url = upload_image(file, folder=settings.cloudinary_sponsors_folder)
+    return service.set_logo_url(session, sponsor_id, url)
 
 
 @router.delete("/{sponsor_id}", status_code=status.HTTP_204_NO_CONTENT)
