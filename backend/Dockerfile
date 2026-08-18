@@ -36,4 +36,4 @@ EXPOSE 8000
 
 # Migrations run before the server so a deploy can never serve an old schema.
 # Exec form so signals reach the process and the container stops cleanly.
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "python -m app.preflight && alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

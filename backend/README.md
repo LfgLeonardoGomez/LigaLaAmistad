@@ -78,8 +78,15 @@ docker build -t liga-api .
 docker run --rm -p 8000:8000   -e DATABASE_URL=... -e SECRET_KEY=... liga-api
 ```
 
-El contenedor corre `alembic upgrade head` y recien despues levanta el servidor,
-asi un deploy nunca sirve un esquema viejo.
+El contenedor corre, en este orden: `python -m app.preflight`, luego
+`alembic upgrade head`, y recien entonces el servidor. Asi un deploy nunca
+sirve un esquema viejo, y una variable mal cargada falla con una linea legible
+en vez de un traceback de SQLAlchemy.
+
+El preflight existe por un motivo concreto: `database_url` tiene un valor por
+defecto que apunta al Postgres local, comodo para desarrollo. En un contenedor,
+ese default hace que una `DATABASE_URL` faltante se manifieste como
+"connection refused to 127.0.0.1:5433" en vez de decir que falta la variable.
 
 Variables a cargar en Railway:
 
