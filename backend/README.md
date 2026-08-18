@@ -78,8 +78,8 @@ docker build -t liga-api .
 docker run --rm -p 8000:8000   -e DATABASE_URL=... -e SECRET_KEY=... liga-api
 ```
 
-El contenedor corre, en este orden: `python -m app.preflight`, luego
-`alembic upgrade head`, y recien entonces el servidor. Asi un deploy nunca
+El contenedor corre, en este orden: `python -m app.preflight`,
+`alembic upgrade head`, `python -m app.seed`, y recien entonces el servidor. Asi un deploy nunca
 sirve un esquema viejo, y una variable mal cargada falla con una linea legible
 en vez de un traceback de SQLAlchemy.
 

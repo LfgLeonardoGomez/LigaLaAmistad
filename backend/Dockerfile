@@ -34,6 +34,13 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV PORT=8000
 EXPOSE 8000
 
-# Migrations run before the server so a deploy can never serve an old schema.
+# preflight -> migrations -> seed -> server. Migrations run before the server so
+# a deploy can never serve an old schema, and the seed runs after them because
+# it writes rows into the tables they create.
+#
+# The seed is idempotent by design: it creates the two zones and the first admin
+# only if they are missing. Running it on every boot removes a manual step that
+# on Railway would otherwise need their CLI.
+#
 # Exec form so signals reach the process and the container stops cleanly.
-CMD ["sh", "-c", "python -m app.preflight && alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "python -m app.preflight && alembic upgrade head && python -m app.seed && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
