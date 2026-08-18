@@ -51,8 +51,16 @@ export function HomePage() {
   // The API returns played matches oldest first; the home wants the newest.
   const recent = useMemo(() => [...(matches.data ?? [])].reverse().slice(0, 3), [matches.data])
 
+  // Filtered again on this side on purpose. An unknown query parameter is
+  // ignored rather than rejected, so a front end that ships before the API
+  // would quietly render played matches under "próximos". Better to show
+  // nothing than to show the wrong thing.
+  const pending = useMemo(
+    () => (upcoming.data ?? []).filter((match) => match.status === 'pending'),
+    [upcoming.data],
+  )
   // Already soonest first from the API, so the nearest three are the head.
-  const next = useMemo(() => (upcoming.data ?? []).slice(0, 3), [upcoming.data])
+  const next = useMemo(() => pending.slice(0, 3), [pending])
 
   return (
     <>
@@ -99,26 +107,21 @@ export function HomePage() {
 
       <PhotoBand />
 
-      <section className="container-page py-[clamp(36px,6vw,64px)]">
-        <div className="mb-6 flex items-baseline justify-between gap-4">
-          <h2 className="display text-[clamp(24px,4.5vw,40px)]">Próximos partidos</h2>
-          {next.length > 0 && (
+      {/* No fixtures means no section. A visitor gains nothing from being told
+          that a list is empty, and the home already says where the league
+          stands through the results above. */}
+      {next.length > 0 && (
+        <section className="container-page py-[clamp(36px,6vw,64px)]">
+          <div className="mb-6 flex items-baseline justify-between gap-4">
+            <h2 className="display text-[clamp(24px,4.5vw,40px)]">Próximos partidos</h2>
             <span
               className="text-xs font-semibold tracking-widest uppercase"
               style={{ color: 'var(--color-fg-muted)' }}
             >
-              {upcoming.data?.length} por jugar
+              {pending.length} por jugar
             </span>
-          )}
-        </div>
+          </div>
 
-        {upcoming.loading ? (
-          <Notice>Cargando…</Notice>
-        ) : upcoming.error ? (
-          <Notice tone="hot">{upcoming.error}</Notice>
-        ) : next.length === 0 ? (
-          <Notice>No hay partidos programados por ahora.</Notice>
-        ) : (
           <div className="grid gap-4 md:grid-cols-3">
             {next.map((match) => (
               <UpcomingCard
@@ -129,8 +132,8 @@ export function HomePage() {
               />
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       <section className="container-page py-[clamp(36px,6vw,64px)]">
         <h2 className="display mb-6 text-[clamp(24px,4.5vw,40px)]">Cómo funciona</h2>
