@@ -17,7 +17,11 @@ from app.zones.models import Zone
 ZONE_NAMES = ["Zona A", "Zona B"]
 
 DEFAULT_ADMIN_EMAIL = "admin@ligalaamistad.com"
-DEFAULT_ADMIN_PASSWORD = "changeme"
+
+# There is deliberately no default password. A default here is published in the
+# repository, so a deploy that forgets ADMIN_PASSWORD would come up with an
+# admin account whose credentials anyone can read. Failing is the safer outcome.
+MIN_ADMIN_PASSWORD_LENGTH = 8
 
 
 def seed_zones(session: Session) -> None:
@@ -29,10 +33,24 @@ def seed_zones(session: Session) -> None:
 
 def seed_admin(session: Session) -> None:
     email = os.getenv("ADMIN_EMAIL", DEFAULT_ADMIN_EMAIL)
-    password = os.getenv("ADMIN_PASSWORD", DEFAULT_ADMIN_PASSWORD)
 
     if session.exec(select(AdminUser).where(AdminUser.email == email)).first():
         return
+
+    # Only demanded when an admin is about to be created: an existing
+    # deployment keeps booting without it.
+    password = os.getenv("ADMIN_PASSWORD")
+    if not password:
+        raise RuntimeError(
+            "ADMIN_PASSWORD no está definida y hay que crear el primer "
+            "administrador. Definila antes de arrancar; no hay valor por "
+            "defecto a propósito."
+        )
+    if len(password) < MIN_ADMIN_PASSWORD_LENGTH:
+        raise RuntimeError(
+            f"ADMIN_PASSWORD tiene que tener al menos "
+            f"{MIN_ADMIN_PASSWORD_LENGTH} caracteres."
+        )
 
     session.add(AdminUser(email=email, password_hash=hash_password(password)))
     print(f"admin created: {email}")

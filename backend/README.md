@@ -98,6 +98,7 @@ Variables a cargar en Railway:
 | `COOKIE_SECURE` | `true` once served over HTTPS. |
 | `COOKIE_SAMESITE` | `none` in production. Vercel and Railway are different sites, and `lax` would drop the session cookie. Requires `COOKIE_SECURE=true`. |
 | `CLOUDINARY_*` | Without them, image uploads answer 503. |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Obligatorias en el primer arranque. `ADMIN_PASSWORD` no tiene default: sin ella el seed falla en vez de crear un admin con credenciales publicadas en el repo. |
 
 ## Notes
 
