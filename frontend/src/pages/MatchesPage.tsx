@@ -13,6 +13,7 @@ import {
   Card,
   EmptyState,
   Field,
+  FilterTabs,
   Input,
   PageHeader,
   Select,
@@ -70,21 +71,13 @@ export function MatchesPage() {
         action={<Button onClick={() => setCreating(true)}>Nuevo partido</Button>}
       />
 
-      <div className="mb-4 flex gap-1">
-        {FILTERS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => setFilter(option.value)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              filter === option.value
-                ? 'bg-ink-900 text-surface'
-                : 'text-ink-600 hover:bg-ink-200'
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
+      <div className="mb-4">
+      <FilterTabs
+          label="Filtrar por estado"
+          value={filter}
+          onChange={setFilter}
+          options={FILTERS.map((f) => ({ value: f.value, label: f.label }))}
+        />
       </div>
 
       {error && (

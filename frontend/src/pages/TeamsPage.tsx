@@ -12,6 +12,7 @@ import {
   Card,
   EmptyState,
   Field,
+  FilterTabs,
   Input,
   PageHeader,
   Select,
@@ -24,7 +25,10 @@ import { imageUrl } from '../api/images'
 
 export function TeamsPage() {
   const zones = useResource<Zone[]>('/public/zones')
-  const teams = useResource<Team[]>('/admin/teams')
+  const [zoneFilter, setZoneFilter] = useState<number | null>(null)
+  const teams = useResource<Team[]>(
+    zoneFilter === null ? '/admin/teams' : `/admin/teams?zone_id=${zoneFilter}`,
+  )
   const [editing, setEditing] = useState<Team | null>(null)
   const [creating, setCreating] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
@@ -43,6 +47,25 @@ export function TeamsPage() {
         description="Las parejas no se eliminan. Una que abandona la liga se da de baja y conserva su historial."
         action={<Button onClick={() => setCreating(true)}>Nueva pareja</Button>}
       />
+
+      <div className="mb-4 flex flex-wrap items-center gap-4">
+        <FilterTabs
+          label="Filtrar por zona"
+          value={zoneFilter}
+          onChange={setZoneFilter}
+          options={[
+            { value: null, label: 'Todas' },
+            ...(zones.data ?? []).map((zone) => ({ value: zone.id as number | null, label: zone.name })),
+          ]}
+        />
+        {/* The count is what tells the organiser whether the split came out
+            even, which is the whole point of having two zones. */}
+        {!teams.loading && (
+          <span className="text-sm text-ink-500">
+            {teams.data?.length ?? 0} {teams.data?.length === 1 ? 'pareja' : 'parejas'}
+          </span>
+        )}
+      </div>
 
       {teams.error && <Alert>{teams.error}</Alert>}
       {warning && (

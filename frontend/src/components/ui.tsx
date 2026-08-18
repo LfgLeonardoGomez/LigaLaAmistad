@@ -154,3 +154,40 @@ export function EmptyState({ children }: { children: ReactNode }) {
 export function Spinner({ label = 'Cargando…' }: { label?: string }) {
   return <p className="px-4 py-10 text-center text-sm text-ink-400">{label}</p>
 }
+
+/**
+ * The row of filter buttons the panel uses. Shared so Parejas and Partidos
+ * cannot drift into looking like two different products.
+ */
+export function FilterTabs<T extends string | number | null>({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: { value: T; label: string }[]
+  value: T
+  onChange: (value: T) => void
+  label: string
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-wrap gap-1">
+      {options.map((option) => {
+        const active = option.value === value
+        return (
+          <button
+            key={String(option.value)}
+            type="button"
+            onClick={() => onChange(option.value)}
+            aria-pressed={active}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              active ? 'bg-ink-900 text-surface' : 'text-ink-600 hover:bg-ink-200'
+            }`}
+          >
+            {option.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
