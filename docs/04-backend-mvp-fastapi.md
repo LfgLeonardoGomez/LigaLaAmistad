@@ -104,7 +104,12 @@ Acepta filtro opcional `zone_id`.
 
 ### GET /public/matches
 
-Debe devolver solo partidos jugados.
+Acepta `status`. Sin ese parámetro devuelve los jugados, que es lo que un
+visitante entiende por "los resultados", y con `status=pending` devuelve los
+programados, que es lo que usa el inicio para anunciar quién juega.
+
+Esto reemplaza la regla original de que la web pública nunca mostraba
+pendientes: saber quién juega es tan público como saber quién ganó.
 
 Acepta filtro opcional `zone_id`. Como el partido no guarda zona, el filtro se resuelve por la zona de sus parejas.
 

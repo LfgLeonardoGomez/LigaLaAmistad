@@ -41,9 +41,20 @@ Como visitante, quiero ver el historial de partidos jugados para consultar resul
 
 #### Criterios de aceptación
 
-- Solo se muestran partidos jugados.
+- La página de resultados muestra solo partidos jugados.
 - Cada partido muestra zona, fecha, parejas, fotos, resultado por sets y ganador.
-- No se muestran partidos pendientes en la web pública.
+
+### Ver los próximos partidos
+
+Como visitante, quiero ver qué partidos están programados para saber quién
+juega y cuándo.
+
+#### Criterios de aceptación
+
+- El inicio muestra los próximos partidos, del más cercano al más lejano.
+- Cada uno muestra zona, fecha y las dos parejas.
+- No muestra marcador ni permite abrirlo: todavía no hay nada que ver.
+- Se aclara que la hora la arreglan las parejas, porque no se guarda.
 
 ### Ver sponsors
 

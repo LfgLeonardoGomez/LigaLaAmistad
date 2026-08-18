@@ -34,9 +34,19 @@ def list_teams(session: SessionDep, zone_id: int | None = None):
 
 
 @router.get("/matches", response_model=list[MatchRead])
-def list_matches(session: SessionDep, zone_id: int | None = None):
-    """Only played matches. The public site never shows pending ones."""
-    matches = match_service.list_matches(session, MatchStatus.PLAYED, zone_id)
+def list_matches(
+    session: SessionDep,
+    zone_id: int | None = None,
+    status: MatchStatus = MatchStatus.PLAYED,
+):
+    """Played matches by default, pending ones on request.
+
+    The default is `played` because that is what "the results" means to a
+    visitor, and it keeps every existing caller working. Asking for `pending`
+    is how the home lists what is still to be played: knowing who plays next
+    is as much public information as knowing who won.
+    """
+    matches = match_service.list_matches(session, status, zone_id)
     return [match_service.to_read(session, match) for match in matches]
 
 

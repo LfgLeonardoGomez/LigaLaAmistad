@@ -104,3 +104,40 @@ def test_sponsors_can_be_deleted(admin):
 
 def test_sponsor_admin_routes_need_a_session(client):
     assert client.get("/admin/sponsors").status_code == 401
+
+
+def test_the_public_site_can_ask_for_upcoming_matches(admin):
+    """Pending matches used to be invisible to visitors. Knowing who plays
+    next is as public as knowing who won, so they can be asked for."""
+    a, b, c = (make_team(admin, name=n) for n in ("Ana", "Bea", "Cid"))
+    played = make_match(admin, a, b, date="2026-09-01")
+    make_match(admin, a, c, date="2026-09-20")
+    admin.post(f"/admin/matches/{played}/result", json=STRAIGHT_WIN_A)
+
+    assert len(admin.get("/public/matches").json()) == 1
+    assert len(admin.get("/public/matches?status=played").json()) == 1
+
+    upcoming = admin.get("/public/matches?status=pending").json()
+    assert len(upcoming) == 1
+    assert upcoming[0]["status"] == "pending"
+    assert upcoming[0]["winner_team_id"] is None
+    assert upcoming[0]["sets"] == []
+
+
+def test_upcoming_matches_come_soonest_first(admin):
+    a, b, c = (make_team(admin, name=n) for n in ("Ana", "Bea", "Cid"))
+    make_match(admin, a, b, date="2026-10-15")
+    make_match(admin, a, c, date="2026-09-02")
+
+    dates = [m["date"] for m in admin.get("/public/matches?status=pending").json()]
+    assert dates == sorted(dates)
+
+
+def test_upcoming_matches_can_be_filtered_by_zone(admin):
+    a, b = make_team(admin, ZONE_A, "Ana"), make_team(admin, ZONE_A, "Bea")
+    c, d = make_team(admin, ZONE_B, "Cid"), make_team(admin, ZONE_B, "Dan")
+    make_match(admin, a, b)
+    make_match(admin, c, d)
+
+    assert len(admin.get(f"/public/matches?status=pending&zone_id={ZONE_A}").json()) == 1
+    assert len(admin.get(f"/public/matches?status=pending&zone_id={ZONE_B}").json()) == 1

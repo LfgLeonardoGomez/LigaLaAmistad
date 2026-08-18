@@ -38,6 +38,7 @@ export function HomePage() {
   const zones = useResource<Zone[]>('/public/zones')
   const teams = useResource<Team[]>('/public/teams')
   const matches = useResource<Match[]>('/public/matches')
+  const upcoming = useResource<Match[]>('/public/matches?status=pending')
   const sponsors = useResource<Sponsor[]>('/public/sponsors')
 
   const teamsById = useMemo(
@@ -49,6 +50,9 @@ export function HomePage() {
 
   // The API returns played matches oldest first; the home wants the newest.
   const recent = useMemo(() => [...(matches.data ?? [])].reverse().slice(0, 3), [matches.data])
+
+  // Already soonest first from the API, so the nearest three are the head.
+  const next = useMemo(() => (upcoming.data ?? []).slice(0, 3), [upcoming.data])
 
   return (
     <>
@@ -94,6 +98,39 @@ export function HomePage() {
       </section>
 
       <PhotoBand />
+
+      <section className="container-page py-[clamp(36px,6vw,64px)]">
+        <div className="mb-6 flex items-baseline justify-between gap-4">
+          <h2 className="display text-[clamp(24px,4.5vw,40px)]">Próximos partidos</h2>
+          {next.length > 0 && (
+            <span
+              className="text-xs font-semibold tracking-widest uppercase"
+              style={{ color: 'var(--color-fg-muted)' }}
+            >
+              {upcoming.data?.length} por jugar
+            </span>
+          )}
+        </div>
+
+        {upcoming.loading ? (
+          <Notice>Cargando…</Notice>
+        ) : upcoming.error ? (
+          <Notice tone="hot">{upcoming.error}</Notice>
+        ) : next.length === 0 ? (
+          <Notice>No hay partidos programados por ahora.</Notice>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            {next.map((match) => (
+              <UpcomingCard
+                key={match.id}
+                match={match}
+                teamsById={teamsById}
+                zones={zones.data ?? []}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="container-page py-[clamp(36px,6vw,64px)]">
         <h2 className="display mb-6 text-[clamp(24px,4.5vw,40px)]">Cómo funciona</h2>
@@ -314,6 +351,53 @@ function Trophy() {
     >
       <path d="M6 3h12v2h3v3a4 4 0 0 1-3.4 3.95A6 6 0 0 1 13 15.9V18h3a1 1 0 0 1 0 2H8a1 1 0 0 1 0-2h3v-2.1a6 6 0 0 1-4.6-3.95A4 4 0 0 1 3 8V5h3V3Zm0 4H5v1a2 2 0 0 0 1 1.73V7Zm12 2.73A2 2 0 0 0 19 8V7h-1v2.73Z" />
     </svg>
+  )
+}
+
+/**
+ * A match that has not been played yet: who plays and when, and nothing else.
+ *
+ * Not clickable, unlike a played one. There is no score, no photo and no jab
+ * to open — a dialog would promise something that does not exist yet.
+ */
+function UpcomingCard({
+  match,
+  teamsById,
+  zones,
+}: {
+  match: Match
+  teamsById: Map<number, Team>
+  zones: Zone[]
+}) {
+  const teamA = teamsById.get(match.team_a_id)
+  const teamB = teamsById.get(match.team_b_id)
+  const zoneName = zones.find((zone) => zone.id === teamA?.zone_id)?.name
+
+  return (
+    <article className="card p-4">
+      <div
+        className="mb-3 flex items-center justify-between text-[11px] font-semibold tracking-widest uppercase"
+        style={{ color: 'var(--color-fg-muted)' }}
+      >
+        <span>{zoneName ?? '—'}</span>
+        <time dateTime={match.date} style={{ color: 'var(--color-accent)' }}>
+          {formatDate(match.date)}
+        </time>
+      </div>
+
+      {[teamA, teamB].map((team, index) => (
+        <div key={index} className="flex items-center gap-2.5 py-1">
+          <TeamAvatar team={team} size={24} />
+          <span className="min-w-0 flex-1 truncate text-sm">
+            {team ? `${team.player_one_name} / ${team.player_two_name}` : '—'}
+          </span>
+        </div>
+      ))}
+
+      <p className="mt-3 text-[11px]" style={{ color: 'var(--color-fg-muted)' }}>
+        La hora la arreglan las parejas.
+      </p>
+    </article>
   )
 }
 
