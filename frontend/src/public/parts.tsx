@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 
 import type { Team } from '../api/types'
@@ -157,4 +158,72 @@ export function formatDate(value: string): string {
   const [year, month, day] = value.split('-').map(Number)
   if (!year || !month || !day) return value
   return `${day} ${MONTHS[month - 1]}`
+}
+
+/**
+ * A dialog wearing the public site's tokens.
+ *
+ * The panel has its own `Modal`, built on the admin palette. Reusing it here
+ * would drag the admin's whites and greys into a themed page.
+ */
+export function PublicModal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  children: ReactNode
+}) {
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center"
+      style={{ backgroundColor: 'color-mix(in srgb, var(--color-canvas) 80%, transparent)' }}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="card w-full max-w-md"
+        style={{ backgroundColor: 'var(--color-canvas)' }}
+      >
+        <div
+          className="flex items-center justify-between gap-3 px-4 py-3"
+          style={{ borderBottom: '1px solid var(--color-rule)' }}
+        >
+          <h2 className="display text-sm">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="rounded p-1 transition-opacity hover:opacity-70"
+            style={{ color: 'var(--color-fg-muted)' }}
+          >
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+              <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-4">{children}</div>
+      </div>
+    </div>
+  )
 }

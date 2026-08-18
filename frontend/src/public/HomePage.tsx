@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import type { Match, Sponsor, Team, Zone } from '../api/types'
 import { useResource } from '../api/useResource'
-import { Notice, TeamAvatar, formatDate } from './parts'
+import { MatchDetail } from './MatchDetail'
+import { Notice, PublicModal, TeamAvatar, formatDate } from './parts'
 import { imageUrl } from '../api/images'
 
 const POINT_RULES = [
@@ -44,6 +45,8 @@ export function HomePage() {
     [teams.data],
   )
 
+  const [openMatch, setOpenMatch] = useState<Match | null>(null)
+
   // The API returns played matches oldest first; the home wants the newest.
   const recent = useMemo(() => [...(matches.data ?? [])].reverse().slice(0, 3), [matches.data])
 
@@ -83,6 +86,7 @@ export function HomePage() {
                 match={match}
                 teamsById={teamsById}
                 zones={zones.data ?? []}
+                onOpen={() => setOpenMatch(match)}
               />
             ))}
           </div>
@@ -126,6 +130,16 @@ export function HomePage() {
           </RuleCard>
         </div>
       </section>
+
+      {openMatch && (
+        <PublicModal title="El partido" onClose={() => setOpenMatch(null)}>
+          <MatchDetail
+            match={openMatch}
+            teamsById={teamsById}
+            zones={zones.data ?? []}
+          />
+        </PublicModal>
+      )}
 
       {sponsors.data && sponsors.data.length > 0 && (
         <section className="container-page py-[clamp(28px,5vw,52px)]">
@@ -307,10 +321,12 @@ function MatchCard({
   match,
   teamsById,
   zones,
+  onOpen,
 }: {
   match: Match
   teamsById: Map<number, Team>
   zones: Zone[]
+  onOpen: () => void
 }) {
   const teamA = teamsById.get(match.team_a_id)
   const teamB = teamsById.get(match.team_b_id)
@@ -324,8 +340,15 @@ function MatchCard({
         : set.team_b_games > set.team_a_games,
     ).length
 
+  const hasExtras = Boolean(match.photo_url || match.comment)
+
   return (
-    <article className="card card-hover p-4">
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-haspopup="dialog"
+      className="card card-hover block w-full p-4 text-left"
+    >
       <div
         className="mb-3 flex items-center justify-between text-[11px] font-semibold tracking-widest uppercase"
         style={{ color: 'var(--color-fg-muted)' }}
@@ -366,7 +389,15 @@ function MatchCard({
           </div>
         )
       })}
-    </article>
+
+      <span
+        className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold tracking-widest uppercase"
+        style={{ color: 'var(--color-accent)' }}
+      >
+        {hasExtras ? 'Ver foto y comentario' : 'Ver el partido'}
+        <span aria-hidden="true">→</span>
+      </span>
+    </button>
   )
 }
 
