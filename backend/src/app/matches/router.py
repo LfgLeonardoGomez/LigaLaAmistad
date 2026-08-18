@@ -1,10 +1,18 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, UploadFile, status
 
 from app.auth.deps import get_current_admin
+from app.core.config import settings
+from app.core.images import upload_image
 from app.database.session import SessionDep
 from app.matches import service
 from app.matches.models import MatchStatus
-from app.matches.schemas import MatchCreate, MatchRead, MatchResultIn, MatchUpdate
+from app.matches.schemas import (
+    MatchCommentIn,
+    MatchCreate,
+    MatchRead,
+    MatchResultIn,
+    MatchUpdate,
+)
 
 router = APIRouter(
     prefix="/admin/matches",
@@ -53,6 +61,20 @@ def set_result(match_id: int, data: MatchResultIn, session: SessionDep):
 @router.put("/{match_id}/result", response_model=MatchRead)
 def replace_result(match_id: int, data: MatchResultIn, session: SessionDep):
     return service.to_read(session, service.replace_result(session, match_id, data))
+
+
+@router.patch("/{match_id}/result", response_model=MatchRead)
+def set_result_comment(match_id: int, data: MatchCommentIn, session: SessionDep):
+    """Edit the comment without re-sending the sets."""
+    return service.to_read(session, service.set_comment(session, match_id, data.comment))
+
+
+@router.post("/{match_id}/result/photo", response_model=MatchRead)
+def upload_match_photo(match_id: int, file: UploadFile, session: SessionDep):
+    """Upload the match photo. Not `async`: the Cloudinary call blocks."""
+    service.require_played(session, match_id, "adding a photo")  # before the upload
+    url = upload_image(file, folder=settings.cloudinary_matches_folder)
+    return service.to_read(session, service.set_photo_url(session, match_id, url))
 
 
 @router.delete("/{match_id}/result", response_model=MatchRead)

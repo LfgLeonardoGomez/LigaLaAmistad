@@ -109,6 +109,28 @@ function ResultCard({
           games={match.sets.map((set) => set.team_b_games)}
         />
       </div>
+
+      {/* Both are optional and most matches have neither, so each one renders
+          nothing at all rather than an empty slot: a card without them has to
+          look exactly like it did before the feature existed. */}
+      {match.photo_url && (
+        <img
+          src={match.photo_url}
+          alt=""
+          loading="lazy"
+          className="block aspect-[4/3] w-full object-cover"
+          style={{ borderTop: '1px solid var(--color-rule)' }}
+        />
+      )}
+
+      {match.comment && (
+        <p
+          className="px-3 py-2.5 text-[13px] leading-relaxed break-words text-pretty"
+          style={{ borderTop: '1px solid var(--color-rule)', color: 'var(--color-fg)' }}
+        >
+          {match.comment}
+        </p>
+      )}
     </article>
   )
 }

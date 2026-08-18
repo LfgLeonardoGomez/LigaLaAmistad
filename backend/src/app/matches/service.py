@@ -147,6 +147,18 @@ def _clear_sets(session: Session, match_id: int) -> None:
         session.delete(existing)
 
 
+def require_played(session: Session, match_id: int, action: str) -> Match:
+    """The match, or 404/400. The photo and the comment decorate a result.
+
+    Public because the photo endpoint calls it to fail before paying for an
+    upload that would then be attached to nothing.
+    """
+    match = get_match(session, match_id)
+    if match.status is not MatchStatus.PLAYED:
+        raise _bad_request(f"Load the result before {action}")
+    return match
+
+
 def set_result(session: Session, match_id: int, data: MatchResultIn) -> Match:
     """Load the result of a pending match. The match becomes `played`."""
     match = get_match(session, match_id)
@@ -156,6 +168,7 @@ def set_result(session: Session, match_id: int, data: MatchResultIn) -> Match:
     _validate_sets(data)
     _write_sets(session, match, data)
     match.status = MatchStatus.PLAYED
+    match.comment = data.comment
     session.add(match)
     session.commit()
     session.refresh(match)
@@ -163,7 +176,13 @@ def set_result(session: Session, match_id: int, data: MatchResultIn) -> Match:
 
 
 def replace_result(session: Session, match_id: int, data: MatchResultIn) -> Match:
-    """Replace the result of a played match. It stays `played`."""
+    """Replace the result of a played match. It stays `played`.
+
+    Only the sets are replaced. The photo and the comment belong to the match,
+    not to the marker, so fixing a wrong score does not throw them away — a
+    `comment` absent from the body keeps the stored one, and sending one
+    replaces it.
+    """
     match = get_match(session, match_id)
     if match.status is not MatchStatus.PLAYED:
         raise _bad_request("This match has no result to replace. Use POST to load one")
@@ -172,19 +191,48 @@ def replace_result(session: Session, match_id: int, data: MatchResultIn) -> Matc
     _clear_sets(session, match_id)
     session.flush()
     _write_sets(session, match, data)
+    if "comment" in data.model_fields_set:
+        match.comment = data.comment
+    session.add(match)
+    session.commit()
+    session.refresh(match)
+    return match
+
+
+def set_comment(session: Session, match_id: int, comment: str | None) -> Match:
+    """Edit only the comment. `null` erases it and leaves the result intact."""
+    match = require_played(session, match_id, "commenting on it")
+    match.comment = comment
+    session.add(match)
+    session.commit()
+    session.refresh(match)
+    return match
+
+
+def set_photo_url(session: Session, match_id: int, photo_url: str) -> Match:
+    match = require_played(session, match_id, "adding a photo")
+    match.photo_url = photo_url
+    session.add(match)
     session.commit()
     session.refresh(match)
     return match
 
 
 def delete_result(session: Session, match_id: int) -> Match:
-    """Undo the result. The match goes back to `pending`."""
+    """Undo the result. The match goes back to `pending`.
+
+    The photo and the comment go with it. A pending match can have its date and
+    even its teams corrected, so keeping a jab aimed at the losing pair would
+    risk showing it over a completely different pairing later on.
+    """
     match = get_match(session, match_id)
     if match.status is not MatchStatus.PLAYED:
         raise _bad_request("This match has no result to undo")
 
     _clear_sets(session, match_id)
     match.status = MatchStatus.PENDING
+    match.photo_url = None
+    match.comment = None
     session.add(match)
     session.commit()
     session.refresh(match)
@@ -215,4 +263,6 @@ def to_read(session: Session, match: Match) -> MatchRead:
         status=match.status,
         sets=[SetRead.model_validate(s, from_attributes=True) for s in sets],
         winner_team_id=winner_team_id(match, sets),
+        photo_url=match.photo_url,
+        comment=match.comment,
     )

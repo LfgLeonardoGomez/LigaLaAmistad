@@ -8,6 +8,10 @@ from sqlmodel import Field, SQLModel
 
 from app.core.models import TimestampMixin
 
+# One tweet. The comment is a jab at the losing pair, not a match report, and a
+# hard cap keeps the public result card from growing a wall of text.
+COMMENT_MAX_LENGTH = 280
+
 
 class MatchStatus(str, enum.Enum):
     """A match is `played` only once its sets have been loaded."""
@@ -22,6 +26,9 @@ class Match(TimestampMixin, table=True):
     Has no `zone_id` on purpose: the zone is derived from the teams, which are
     validated to belong to the same zone when the match is created.
     The winner is not stored either — it is computed from the sets.
+
+    `photo_url` and `comment` hang off the result, not off the scoreboard: a
+    correction of the marker keeps them, undoing the result drops them.
     """
 
     __tablename__ = "matches"
@@ -44,6 +51,8 @@ class Match(TimestampMixin, table=True):
             nullable=False,
         ),
     )
+    photo_url: str | None = Field(default=None, max_length=255)
+    comment: str | None = Field(default=None, max_length=COMMENT_MAX_LENGTH)
 
 
 class MatchSet(SQLModel, table=True):
