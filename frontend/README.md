@@ -96,6 +96,20 @@ ruta            sin rewrite  con rewrite
 /admin                  404          200
 ```
 
+### Redespliegue automatico
+
+Vercel redespliega con cada push a `main`. Como el repositorio tambien tiene el
+backend, conviene evitar builds que no cambian nada.
+
+Settings -> Git -> *Ignored Build Step*:
+
+```bash
+git diff --quiet HEAD^ HEAD -- ./
+```
+
+Corre parado en el *Root Directory*, que es `frontend/`. Si el commit no toco
+nada de esta carpeta, termina con codigo 0 y Vercel cancela el build.
+
 ### Despues del primer deploy
 
 Vercel te da un dominio. Hay que volver a Railway y ajustar tres variables,

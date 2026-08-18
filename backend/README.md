@@ -100,6 +100,19 @@ Variables a cargar en Railway:
 | `CLOUDINARY_*` | Without them, image uploads answer 503. |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Obligatorias en el primer arranque. `ADMIN_PASSWORD` no tiene default: sin ella el seed falla en vez de crear un admin con credenciales publicadas en el repo. |
 
+### Redespliegue automatico
+
+Railway redespliega con cada push a `main`. Como el repositorio tambien tiene
+el frontend, conviene decirle que solo mire esta carpeta, o un cambio de CSS
+reinicia la API sin motivo.
+
+Settings del servicio -> *Watch Paths*:
+
+```txt
+backend/**
+```
+
+
 ## Notes
 
 - Standings are recomputed on every read. Correcting a result invalidates nothing.
