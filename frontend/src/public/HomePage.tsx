@@ -12,6 +12,26 @@ const POINT_RULES = [
   { label: 'Perder 0-2', value: '0 pts' },
 ]
 
+/**
+ * Every pair plays every other pair inside its own zone, so a zone of n pairs
+ * produces n·(n-1)/2 matches. Two zones of ten give ninety.
+ *
+ * Computed and not hard coded: the day a zone ends up with nine or eleven
+ * pairs, a fixed number would turn the headline into a lie.
+ */
+function seasonMatches(teams: Team[]): number {
+  const perZone = new Map<number, number>()
+  for (const team of teams) {
+    perZone.set(team.zone_id, (perZone.get(team.zone_id) ?? 0) + 1)
+  }
+
+  let total = 0
+  for (const count of perZone.values()) {
+    total += (count * (count - 1)) / 2
+  }
+  return total
+}
+
 export function HomePage() {
   const zones = useResource<Zone[]>('/public/zones')
   const teams = useResource<Team[]>('/public/teams')
@@ -28,7 +48,11 @@ export function HomePage() {
 
   return (
     <>
-      <Hero teams={teams.data?.length} zones={zones.data?.length} played={matches.data?.length} />
+      <Hero
+        teams={teams.data?.length}
+        zones={zones.data?.length}
+        seasonTotal={teams.data ? seasonMatches(teams.data) : undefined}
+      />
 
       <section className="container-page py-[clamp(36px,6vw,64px)]">
         <div className="mb-6 flex items-baseline justify-between gap-4">
@@ -126,11 +150,11 @@ export function HomePage() {
 function Hero({
   teams,
   zones,
-  played,
+  seasonTotal,
 }: {
   teams: number | undefined
   zones: number | undefined
-  played: number | undefined
+  seasonTotal: number | undefined
 }) {
   return (
     <section className="photo">
@@ -152,12 +176,14 @@ function Hero({
           La <span style={{ color: 'var(--color-accent)' }}>Amistad</span>
         </h1>
 
+        {/* A slogan, not a description: the numbers below already explain the
+            format, so this line only has to say what the league feels like. */}
         <p
-          className="hero-measure mt-6 max-w-[52ch] text-[clamp(16px,2.2vw,20px)] leading-relaxed text-pretty"
-          style={{ color: 'var(--color-fg-muted)' }}
+          className="hero-measure mt-6 max-w-[28ch] text-[clamp(19px,3vw,30px)] leading-snug text-balance"
+          style={{ color: 'var(--color-fg)' }}
         >
-          Pádel de barrio, en serio. Parejas repartidas en dos zonas, todos contra todos,
-          partidos al mejor de tres sets. Cada resultado que se carga mueve la tabla.
+          Los amigos de siempre,{' '}
+          <span style={{ color: 'var(--color-accent)' }}>enfrentados como nunca.</span>
         </p>
 
         <div className="hero-row mt-8 flex flex-wrap gap-3">
@@ -177,12 +203,18 @@ function Hero({
           </Link>
         </div>
 
-        <dl className="hero-row mt-12 flex flex-wrap gap-x-10 gap-y-4">
-          <Stat value={teams} label="Parejas" />
-          <Stat value={zones} label="Zonas" />
-          <Stat value={3} label="Sets, al mejor de" />
-          <Stat value={played} label="Partidos jugados" />
-        </dl>
+        <p
+          className="hero-row mt-12 flex flex-wrap items-baseline gap-x-3 gap-y-2 text-[clamp(15px,2vw,19px)]"
+          style={{ color: 'var(--color-fg-muted)' }}
+        >
+          <Beat value={teams} word="parejas" />
+          <Dot />
+          <Beat value={zones} word="zonas" />
+          <Dot />
+          <Beat value={seasonTotal} word="partidos" />
+          <Dot />
+          <Beat value={1} word="campeón" trophy />
+        </p>
       </div>
     </section>
   )
@@ -222,25 +254,51 @@ function PhotoBand() {
   )
 }
 
-function Stat({ value, label }: { value: number | undefined; label: string }) {
+/** One beat of the headline: a number and the word that follows it. */
+function Beat({
+  value,
+  word,
+  trophy = false,
+}: {
+  value: number | undefined
+  word: string
+  trophy?: boolean
+}) {
   return (
-    <div>
-      <dt className="sr-only">{label}</dt>
-      <dd>
-        <span
-          className="display block text-[clamp(28px,5vw,44px)]"
-          style={{ color: 'var(--color-accent)' }}
-        >
-          {value ?? '—'}
-        </span>
-        <span
-          className="mt-1 block text-[11px] font-semibold tracking-widest uppercase"
-          style={{ color: 'var(--color-fg-muted)' }}
-        >
-          {label}
-        </span>
-      </dd>
-    </div>
+    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
+      <span
+        className="display text-[clamp(24px,4vw,38px)]"
+        style={{ color: 'var(--color-accent)' }}
+      >
+        {value ?? '—'}
+      </span>
+      {trophy && <Trophy />}
+      <span>{word}</span>
+    </span>
+  )
+}
+
+function Dot() {
+  return (
+    <span aria-hidden="true" style={{ color: 'var(--color-rule)' }}>
+      ·
+    </span>
+  )
+}
+
+/** Drawn rather than an emoji: an emoji renders differently on every platform
+    and would be the only thing on the page not wearing the theme's colour. */
+function Trophy() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-[0.95em] w-[0.95em] self-center"
+      fill="currentColor"
+      style={{ color: 'var(--color-accent)' }}
+    >
+      <path d="M6 3h12v2h3v3a4 4 0 0 1-3.4 3.95A6 6 0 0 1 13 15.9V18h3a1 1 0 0 1 0 2H8a1 1 0 0 1 0-2h3v-2.1a6 6 0 0 1-4.6-3.95A4 4 0 0 1 3 8V5h3V3Zm0 4H5v1a2 2 0 0 0 1 1.73V7Zm12 2.73A2 2 0 0 0 19 8V7h-1v2.73Z" />
+    </svg>
   )
 }
 
