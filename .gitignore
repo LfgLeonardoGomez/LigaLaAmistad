@@ -42,3 +42,6 @@ docs/__Inspiraci*/*.jpg
 
 # Capturas de pantalla de referencia: quedan locales
 docs/__Inspiraci*/*.png
+
+# Worktrees de agentes en segundo plano
+.claude/
