@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import type { Match, Sponsor, Team, Zone } from '../api/types'
 import { useResource } from '../api/useResource'
 import { Notice, TeamAvatar, formatDate } from './parts'
+import { imageUrl } from '../api/images'
 
 const POINT_RULES = [
   { label: 'Ganar 2-0', value: '3 pts' },
@@ -395,7 +396,7 @@ function RuleCard({
 function SponsorTile({ sponsor }: { sponsor: Sponsor }) {
   const image = (
     <img
-      src={sponsor.logo_url}
+      src={imageUrl(sponsor.logo_url, { width: 240 })}
       alt={sponsor.name}
       loading="lazy"
       className="h-14 w-full object-contain p-2"

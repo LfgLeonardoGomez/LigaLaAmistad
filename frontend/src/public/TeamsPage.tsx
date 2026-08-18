@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { Team, Zone } from '../api/types'
 import { useResource } from '../api/useResource'
 import { Notice, PageTitle, ZoneTabs } from './parts'
+import { imageUrl } from '../api/images'
 
 export function PublicTeamsPage() {
   const zones = useResource<Zone[]>('/public/zones')
@@ -89,7 +90,7 @@ function Photo({ team }: { team: Team }) {
   if (team.photo_url) {
     return (
       <img
-        src={team.photo_url}
+        src={imageUrl(team.photo_url, { width: 400, height: 300 })}
         alt={`${team.player_one_name} y ${team.player_two_name}`}
         loading="lazy"
         className="aspect-4/3 w-full object-cover"

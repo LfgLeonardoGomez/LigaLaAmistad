@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import { COMMENT_MAX_LENGTH } from '../api/types'
 import type { Match } from '../api/types'
 import { Alert, Button, Field, Input, Textarea } from '../components/ui'
+import { imageUrl } from '../api/images'
 
 interface SetRow {
   a: string
@@ -161,7 +162,7 @@ export function ResultForm({
       {match.photo_url && !photo && (
         <div className="flex items-center gap-3">
           <img
-            src={match.photo_url}
+            src={imageUrl(match.photo_url, { width: 160, height: 112 })}
             alt=""
             className="h-14 w-20 rounded object-cover ring-1 ring-ink-200"
           />

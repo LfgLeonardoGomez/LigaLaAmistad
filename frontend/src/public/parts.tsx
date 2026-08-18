@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import type { Team } from '../api/types'
+import { imageUrl } from '../api/images'
 
 export function PageTitle({ title, lead }: { title: string; lead?: string }) {
   return (
@@ -88,7 +89,7 @@ export function TeamAvatar({ team, size = 28 }: { team: Team | undefined; size?:
   if (team?.photo_url) {
     return (
       <img
-        src={team.photo_url}
+        src={imageUrl(team.photo_url, { width: size, height: size })}
         alt=""
         loading="lazy"
         className="flex-none rounded-full object-cover"

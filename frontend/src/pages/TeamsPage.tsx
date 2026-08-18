@@ -20,6 +20,7 @@ import {
   Td,
   Th,
 } from '../components/ui'
+import { imageUrl } from '../api/images'
 
 export function TeamsPage() {
   const zones = useResource<Zone[]>('/public/zones')
@@ -105,7 +106,7 @@ function Photo({ team }: { team: Team }) {
   if (team.photo_url) {
     return (
       <img
-        src={team.photo_url}
+        src={imageUrl(team.photo_url, { width: 72, height: 72 })}
         alt=""
         className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-ink-200"
       />

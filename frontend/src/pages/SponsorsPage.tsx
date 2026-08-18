@@ -18,6 +18,7 @@ import {
   Td,
   Th,
 } from '../components/ui'
+import { imageUrl } from '../api/images'
 
 export function SponsorsPage() {
   const sponsors = useResource<Sponsor[]>('/admin/sponsors')
@@ -81,7 +82,7 @@ export function SponsorsPage() {
                 <Td>
                   <div className="flex items-center gap-3">
                     <img
-                      src={sponsor.logo_url}
+                      src={imageUrl(sponsor.logo_url, { width: 96, height: 96 })}
                       alt=""
                       className="h-8 w-8 rounded object-contain ring-1 ring-ink-200"
                     />

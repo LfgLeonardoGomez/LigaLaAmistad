@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Match, Team, Zone } from '../api/types'
 import { useResource } from '../api/useResource'
 import { Notice, PageTitle, Pagination, TeamAvatar, ZoneTabs, formatDate } from './parts'
+import { imageUrl } from '../api/images'
 
 const PER_PAGE = 20
 
@@ -115,7 +116,7 @@ function ResultCard({
           look exactly like it did before the feature existed. */}
       {match.photo_url && (
         <img
-          src={match.photo_url}
+          src={imageUrl(match.photo_url, { width: 600 })}
           alt=""
           loading="lazy"
           className="block aspect-[4/3] w-full object-cover"
