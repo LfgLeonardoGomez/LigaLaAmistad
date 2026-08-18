@@ -1,8 +1,9 @@
 """A sliding window rate limiter, kept in memory.
 
 Enough to stop someone guessing admin passwords from a script. It is per
-process, so it does not survive a restart and does not add up across instances.
-If the API ever runs on more than one instance, this has to move to Redis.
+process, so it does not survive a restart and does not add up across
+instances. If the API ever runs on more than one instance, this has to move to
+Redis.
 """
 
 import time
@@ -13,13 +14,28 @@ from fastapi import HTTPException, Request, status
 _attempts: dict[str, list[float]] = defaultdict(list)
 
 
-def _client_key(request: Request) -> str:
+def client_key(request: Request) -> str:
+    """Who is knocking, as far as this can be known behind a proxy.
+
+    `request.client.host` is the address of whatever spoke to the server last.
+    On a platform that routes through a fleet of edge servers that is the edge,
+    not the caller, and it can differ between two requests from the same
+    person — which silently turns the limit off. The forwarded header is the
+    only place the original address survives.
+
+    Treat this as best effort: a caller can put whatever they like in that
+    header. The per-email limit below is the one that actually holds.
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        first = forwarded.split(",")[0].strip()
+        if first:
+            return first
     return request.client.host if request.client else "unknown"
 
 
-def check_rate_limit(request: Request, max_attempts: int, window_seconds: int) -> None:
-    """Raise 429 when this client used up its attempts inside the window."""
-    key = _client_key(request)
+def check_rate_limit(key: str, max_attempts: int, window_seconds: int) -> None:
+    """Raise 429 when this key used up its attempts inside the window."""
     now = time.monotonic()
     cutoff = now - window_seconds
 
@@ -37,9 +53,10 @@ def check_rate_limit(request: Request, max_attempts: int, window_seconds: int) -
     _attempts[key].append(now)
 
 
-def clear_attempts(request: Request) -> None:
-    """Forget this client's attempts. Called after a successful login."""
-    _attempts.pop(_client_key(request), None)
+def clear_attempts(*keys: str) -> None:
+    """Forget these keys. Called after a successful login."""
+    for key in keys:
+        _attempts.pop(key, None)
 
 
 def reset() -> None:

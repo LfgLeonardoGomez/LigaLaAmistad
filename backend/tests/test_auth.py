@@ -76,3 +76,75 @@ def test_a_successful_login_clears_the_counter(client, monkeypatch):
     assert login(client).status_code == 200
 
     assert login(client, password="nope").status_code == 401
+
+
+def test_the_limit_counts_the_forwarded_address_not_the_proxy(client, monkeypatch):
+    """Behind a proxy every request arrives from the proxy, and if the fleet
+    rotates addresses each one looks like a new person. That is how the limit
+    silently stopped working in production."""
+    monkeypatch.setattr(settings, "login_max_attempts", 3)
+
+    # Same caller, seen through three different edge servers.
+    for index in range(3):
+        response = client.post(
+            "/auth/login",
+            json={"email": "otro@test.com", "password": "nope"},
+            headers={"X-Forwarded-For": f"203.0.113.7, 10.0.0.{index}"},
+        )
+        assert response.status_code == 401
+
+    blocked = client.post(
+        "/auth/login",
+        json={"email": "otro@test.com", "password": "nope"},
+        headers={"X-Forwarded-For": "203.0.113.7, 10.0.0.99"},
+    )
+    assert blocked.status_code == 429
+
+
+def test_one_account_is_protected_even_from_many_addresses(client, monkeypatch):
+    """The address bucket can be dodged by rotating addresses. The email one
+    cannot, and it is the bucket that matters when someone grinds down a
+    single account."""
+    monkeypatch.setattr(settings, "login_max_attempts", 3)
+
+    for index in range(3):
+        response = client.post(
+            "/auth/login",
+            json={"email": ADMIN_EMAIL, "password": "nope"},
+            headers={"X-Forwarded-For": f"198.51.100.{index}"},
+        )
+        assert response.status_code == 401
+
+    blocked = client.post(
+        "/auth/login",
+        json={"email": ADMIN_EMAIL, "password": "nope"},
+        headers={"X-Forwarded-For": "198.51.100.200"},
+    )
+    assert blocked.status_code == 429
+
+
+def test_the_email_bucket_ignores_case_and_spacing(client, monkeypatch):
+    monkeypatch.setattr(settings, "login_max_attempts", 2)
+
+    for value in (ADMIN_EMAIL, ADMIN_EMAIL.upper()):
+        client.post("/auth/login", json={"email": value, "password": "nope"})
+
+    blocked = client.post(
+        "/auth/login", json={"email": f"  {ADMIN_EMAIL}  ", "password": "nope"}
+    )
+    assert blocked.status_code == 429
+
+
+def test_a_blocked_account_does_not_block_a_different_one(client, monkeypatch):
+    monkeypatch.setattr(settings, "login_max_attempts", 2)
+
+    for _ in range(3):
+        client.post("/auth/login", json={"email": "victima@test.com", "password": "nope"})
+
+    # The real admin must still be able to get in from another address.
+    response = client.post(
+        "/auth/login",
+        json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+        headers={"X-Forwarded-For": "203.0.113.250"},
+    )
+    assert response.status_code == 200

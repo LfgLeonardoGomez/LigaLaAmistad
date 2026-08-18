@@ -7,7 +7,7 @@ from app.auth.deps import COOKIE_NAME, get_current_admin
 from app.auth.models import AdminUser
 from app.auth.schemas import AdminCreate, AdminRead, AdminUpdate, LoginIn
 from app.core.config import settings
-from app.core.ratelimit import check_rate_limit, clear_attempts
+from app.core.ratelimit import check_rate_limit, clear_attempts, client_key
 from app.core.security import create_access_token
 from app.database.session import SessionDep
 
@@ -18,14 +18,20 @@ CurrentAdmin = Annotated[AdminUser, Depends(get_current_admin)]
 
 @router.post("/login", response_model=AdminRead)
 def login(data: LoginIn, request: Request, response: Response, session: SessionDep):
-    check_rate_limit(
-        request,
-        max_attempts=settings.login_max_attempts,
-        window_seconds=settings.login_window_seconds,
-    )
+    # Two buckets. The address stops a script hammering from one machine; the
+    # email stops the same account being ground down from many, which is the
+    # attack the address bucket cannot see behind a proxy.
+    by_address = f"ip:{client_key(request)}"
+    by_email = f"email:{data.email.strip().lower()}"
+    for key in (by_address, by_email):
+        check_rate_limit(
+            key,
+            max_attempts=settings.login_max_attempts,
+            window_seconds=settings.login_window_seconds,
+        )
 
     admin = service.authenticate(session, data)
-    clear_attempts(request)
+    clear_attempts(by_address, by_email)
 
     response.set_cookie(
         key=COOKIE_NAME,
