@@ -70,8 +70,18 @@ work: for a project this size they add indirection without buying anything.
 
 ## Deploy
 
-`railway.json` runs the migrations and then the server. Set these variables in
-Railway:
+El deploy usa el `Dockerfile`, no el detector automatico de la plataforma. Es
+unas pocas lineas y se puede probar en local antes de subir nada:
+
+```bash
+docker build -t liga-api .
+docker run --rm -p 8000:8000   -e DATABASE_URL=... -e SECRET_KEY=... liga-api
+```
+
+El contenedor corre `alembic upgrade head` y recien despues levanta el servidor,
+asi un deploy nunca sirve un esquema viejo.
+
+Variables a cargar en Railway:
 
 | Variable | Note |
 |---|---|
