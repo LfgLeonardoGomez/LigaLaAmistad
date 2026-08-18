@@ -103,7 +103,7 @@ export function SponsorsPage() {
                       {sponsor.is_active ? 'Ocultar de la web' : 'Mostrar en la web'}
                     </span>
                     <span
-                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-surface transition-all ${
                         sponsor.is_active ? 'left-4.5' : 'left-0.5'
                       }`}
                     />

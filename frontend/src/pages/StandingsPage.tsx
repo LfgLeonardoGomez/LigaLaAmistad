@@ -45,7 +45,7 @@ export function StandingsPage() {
             type="button"
             onClick={() => setZoneId(zone.id)}
             className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              selected === zone.id ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-200'
+              selected === zone.id ? 'bg-ink-900 text-surface' : 'text-ink-600 hover:bg-ink-200'
             }`}
           >
             {zone.name}

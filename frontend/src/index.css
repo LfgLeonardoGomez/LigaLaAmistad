@@ -12,7 +12,11 @@
 --------------------------------------------------------------------------- */
 
 @theme {
-  /* Admin panel — neutral, deliberately quiet. */
+  /* Admin panel — neutral, deliberately quiet.
+     `surface` is what used to be a hardcoded white: cards, inputs and the
+     text that sits on a primary button. Naming it is what lets the panel
+     have a dark mode without editing every component. */
+  --color-surface: #ffffff;
   --color-ink-50: #f8fafc;
   --color-ink-100: #f1f5f9;
   --color-ink-200: #e2e8f0;
@@ -126,6 +130,52 @@
   --hero-inline: 0;
 
   --canvas-glow: none;
+}
+
+
+/* ---------------------------------------------------------------------------
+   Panel administrativo — modo oscuro.
+
+   Tailwind v4 compila cada utilidad a `var(--color-…)`, incluidas las de su
+   propia paleta. Redefinir esas variables acá da vuelta el panel entero sin
+   tocar un solo componente.
+
+   La escala no se invierte sin más: en claro la página es gris y las tarjetas
+   blancas, y en oscuro tiene que pasar lo contrario, la página más oscura que
+   las tarjetas. Por eso los valores están elegidos a mano.
+--------------------------------------------------------------------------- */
+[data-admin='dark'] {
+  --color-surface: #16202f;
+
+  --color-ink-50: #1c2739;
+  --color-ink-100: #0f1722;
+  --color-ink-200: #2a3648;
+  --color-ink-300: #3a4759;
+  --color-ink-400: #7c8ba1;
+  --color-ink-500: #9aa8bd;
+  --color-ink-600: #b6c2d4;
+  --color-ink-700: #cfd8e5;
+  --color-ink-800: #e6ecf5;
+  --color-ink-900: #f4f8ff;
+
+  /* Los estados conservan su significado, con la saturación bajada para que
+     no vibren sobre un fondo oscuro. */
+  --color-emerald-50: #10291f;
+  --color-emerald-200: #1f4736;
+  --color-emerald-700: #6ee7b7;
+
+  --color-amber-50: #2b2110;
+  --color-amber-200: #4a3a1c;
+  --color-amber-700: #fbbf24;
+
+  --color-red-50: #2d1618;
+  --color-red-200: #4d2427;
+  --color-red-600: #dc2626;
+  --color-red-700: #fca5a5;
+
+  --color-blue-50: #12203a;
+  --color-blue-200: #1e3358;
+  --color-blue-700: #93c5fd;
 }
 
 html,

@@ -78,7 +78,7 @@ export function MatchesPage() {
             onClick={() => setFilter(option.value)}
             className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               filter === option.value
-                ? 'bg-ink-900 text-white'
+                ? 'bg-ink-900 text-surface'
                 : 'text-ink-600 hover:bg-ink-200'
             }`}
           >

@@ -13,6 +13,7 @@ import { PublicLayout } from './public/PublicLayout'
 import { PublicResultsPage } from './public/ResultsPage'
 import { PublicStandingsPage } from './public/StandingsPage'
 import { PublicTeamsPage } from './public/TeamsPage'
+import { AdminThemeProvider } from './theme/AdminTheme'
 import { ThemeProvider } from './theme/ThemeProvider'
 
 /** Everything under /admin needs a session. The public site never does. */
@@ -51,9 +52,11 @@ export function App() {
         <Route
           path="/admin"
           element={
-            <AuthProvider>
-              <RequireAdmin />
-            </AuthProvider>
+            <AdminThemeProvider>
+              <AuthProvider>
+                <RequireAdmin />
+              </AuthProvider>
+            </AdminThemeProvider>
           }
         >
           <Route element={<Layout />}>

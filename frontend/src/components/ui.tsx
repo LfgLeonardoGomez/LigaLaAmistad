@@ -9,8 +9,8 @@ import type {
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
 
 const BUTTON_STYLES: Record<ButtonVariant, string> = {
-  primary: 'bg-ink-900 text-white hover:bg-ink-700',
-  secondary: 'bg-white text-ink-700 ring-1 ring-ink-300 hover:bg-ink-50',
+  primary: 'bg-ink-900 text-surface hover:bg-ink-700',
+  secondary: 'bg-surface text-ink-700 ring-1 ring-ink-300 hover:bg-ink-50',
   danger: 'bg-red-600 text-white hover:bg-red-700',
   ghost: 'text-ink-600 hover:bg-ink-100',
 }
@@ -48,7 +48,7 @@ export function Field({ label, hint, children }: FieldProps) {
   )
 }
 
-const CONTROL_STYLES = `w-full rounded-md border-0 bg-white px-3 py-2 text-sm text-ink-900
+const CONTROL_STYLES = `w-full rounded-md border-0 bg-surface px-3 py-2 text-sm text-ink-900
   ring-1 ring-ink-300 placeholder:text-ink-400
   focus:outline-none focus:ring-2 focus:ring-ink-800 disabled:bg-ink-100`
 
@@ -69,7 +69,7 @@ export function Textarea({
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-lg bg-white ring-1 ring-ink-200 ${className}`}>{children}</div>
+    <div className={`rounded-lg bg-surface ring-1 ring-ink-200 ${className}`}>{children}</div>
   )
 }
 

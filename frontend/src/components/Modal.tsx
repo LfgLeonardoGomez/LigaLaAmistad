@@ -34,7 +34,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="w-full max-w-lg rounded-lg bg-white shadow-lg"
+        className="w-full max-w-lg rounded-lg bg-surface shadow-lg"
       >
         <div className="flex items-center justify-between border-b border-ink-200 px-5 py-3.5">
           <h2 className="text-sm font-semibold text-ink-900">{title}</h2>

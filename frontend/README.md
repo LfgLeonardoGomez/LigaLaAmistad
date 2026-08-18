@@ -125,6 +125,33 @@ Vercel y Railway son sitios distintos, asi que la cookie de sesion viaja
 cross-site. Con `lax` el navegador la descarta en silencio: el login responde
 200 y todo lo que sigue responde 401.
 
+## Temas
+
+Son dos sistemas separados, a proposito.
+
+**Sitio publico** — tres paletas (`velada`, `lima`, `papel`) que el visitante
+elige. Es la identidad de la liga, y el atributo es `data-theme` en el `<html>`.
+
+**Panel** — claro y oscuro, atributo `data-admin`. Es una herramienta de
+trabajo, no la identidad de nadie: arranca siguiendo `prefers-color-scheme` y
+recuerda la eleccion manual si la hay.
+
+El modo oscuro del panel no reescribe los componentes. Tailwind v4 compila cada
+utilidad a `var(--color-…)`, incluidas las de su propia paleta, asi que
+redefinir esas variables bajo `[data-admin='dark']` da vuelta el panel entero
+desde el CSS:
+
+```css
+[data-admin='dark'] {
+  --color-ink-900: #f4f8ff;   /* el texto, antes casi negro */
+  --color-emerald-700: #6ee7b7;
+}
+```
+
+Lo unico que hubo que tocar en los componentes fueron los blancos escritos a
+mano: pasaron a `--color-surface`, que es blanco en claro y azul oscuro en
+oscuro. Un `bg-white` no puede seguir a un tema.
+
 ## Layout
 
 ```txt

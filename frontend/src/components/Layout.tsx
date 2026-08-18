@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
+import { AdminThemeToggle } from '../theme/AdminTheme'
 import { Button } from './ui'
 
 const NAV_ITEMS = [
@@ -16,12 +17,13 @@ export function Layout() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="border-b border-ink-200 bg-white">
+      <header className="border-b border-ink-200 bg-surface">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <span className="text-sm font-semibold text-ink-900">Liga La Amistad</span>
 
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-ink-500 sm:inline">{admin?.email}</span>
+            <AdminThemeToggle />
             <Button variant="secondary" onClick={() => void logout()}>
               Salir
             </Button>
