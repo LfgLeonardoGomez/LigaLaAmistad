@@ -2,7 +2,7 @@ import datetime
 
 from sqlmodel import Field, SQLModel
 
-from app.matches.models import MatchStatus
+from app.matches.models import COMMENT_MAX_LENGTH, MatchStatus
 
 
 class MatchCreate(SQLModel):
@@ -28,7 +28,22 @@ class SetIn(SQLModel):
 
 
 class MatchResultIn(SQLModel):
+    """Sets, plus an optional comment.
+
+    On a correction (`PUT`) an absent `comment` leaves the stored one alone,
+    which is why the service reads `model_fields_set` and not just the value.
+    """
+
     sets: list[SetIn]
+    comment: str | None = Field(default=None, max_length=COMMENT_MAX_LENGTH)
+
+
+class MatchCommentIn(SQLModel):
+    """Edits the comment on its own, without touching the sets."""
+
+    model_config = {"extra": "forbid"}
+
+    comment: str | None = Field(default=None, max_length=COMMENT_MAX_LENGTH)
 
 
 class SetRead(SQLModel):
@@ -45,3 +60,5 @@ class MatchRead(SQLModel):
     status: MatchStatus
     sets: list[SetRead] = Field(default_factory=list)
     winner_team_id: int | None = None
+    photo_url: str | None = None
+    comment: str | None = None

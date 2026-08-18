@@ -31,7 +31,12 @@ export interface Match {
   status: MatchStatus
   sets: MatchSet[]
   winner_team_id: number | null
+  photo_url: string | null
+  comment: string | null
 }
+
+/** Mirrors COMMENT_MAX_LENGTH in backend/src/app/matches/models.py. */
+export const COMMENT_MAX_LENGTH = 280
 
 export interface Sponsor {
   id: number

@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     # match the folders that exist in the account, or Cloudinary creates them.
     cloudinary_teams_folder: str = "parejas-liga-la-amistad"
     cloudinary_sponsors_folder: str = "sponsors-liga-la-amistad"
+    cloudinary_matches_folder: str = "partidos-liga-la-amistad"
 
     @field_validator("secret_key")
     @classmethod

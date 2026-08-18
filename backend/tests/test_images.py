@@ -4,7 +4,7 @@ import pytest
 
 from app.core.config import settings
 
-from .conftest import make_team
+from .conftest import STRAIGHT_WIN_A, make_match, make_team
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 100
 
@@ -40,6 +40,27 @@ def test_an_unknown_team_fails_before_the_upload(admin, configured):
 
 def test_an_unknown_sponsor_fails_before_the_upload(admin, configured):
     assert admin.post("/admin/sponsors/999/logo", files=image()).status_code == 404
+
+
+def test_an_unknown_match_fails_before_the_upload(admin, configured):
+    assert admin.post("/admin/matches/999/result/photo", files=image()).status_code == 404
+
+
+def test_a_match_without_a_result_fails_before_the_upload(admin, configured):
+    """The photo belongs to the result, and undoing the result would drop it."""
+    match = make_match(admin, make_team(admin, name="Ana"), make_team(admin, name="Bea"))
+
+    assert admin.post(f"/admin/matches/{match}/result/photo", files=image()).status_code == 400
+
+
+def test_a_failed_upload_leaves_the_match_photo_untouched(admin, configured):
+    match = make_match(admin, make_team(admin, name="Ana"), make_team(admin, name="Bea"))
+    admin.post(f"/admin/matches/{match}/result", json=STRAIGHT_WIN_A)
+
+    response = admin.post(f"/admin/matches/{match}/result/photo", files=image())
+
+    assert response.status_code == 502
+    assert admin.get(f"/admin/matches/{match}").json()["photo_url"] is None
 
 
 def test_a_non_image_is_rejected(admin, configured):

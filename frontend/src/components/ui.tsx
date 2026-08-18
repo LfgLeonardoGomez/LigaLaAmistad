@@ -1,4 +1,10 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+} from 'react'
 
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
 
@@ -52,6 +58,13 @@ export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInpu
 
 export function Select({ className = '', ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={`${CONTROL_STYLES} ${className}`} />
+}
+
+export function Textarea({
+  className = '',
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={`${CONTROL_STYLES} resize-y ${className}`} />
 }
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
