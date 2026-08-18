@@ -27,10 +27,12 @@ export function TeamsPage() {
   const teams = useResource<Team[]>('/admin/teams')
   const [editing, setEditing] = useState<Team | null>(null)
   const [creating, setCreating] = useState(false)
+  const [warning, setWarning] = useState<string | null>(null)
 
-  function done() {
+  function done(message?: string) {
     setEditing(null)
     setCreating(false)
+    setWarning(message ?? null)
     teams.reload()
   }
 
@@ -43,6 +45,11 @@ export function TeamsPage() {
       />
 
       {teams.error && <Alert>{teams.error}</Alert>}
+      {warning && (
+        <div className="mb-4">
+          <Alert tone="info">{warning}</Alert>
+        </div>
+      )}
 
       <Card>
         {teams.loading ? (
@@ -125,12 +132,13 @@ function CreateForm({
   onCancel,
 }: {
   zones: Zone[]
-  onDone: () => void
+  onDone: (warning?: string) => void
   onCancel: () => void
 }) {
   const [playerOne, setPlayerOne] = useState('')
   const [playerTwo, setPlayerTwo] = useState('')
   const [zoneId, setZoneId] = useState('')
+  const [photo, setPhoto] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -139,11 +147,25 @@ function CreateForm({
     setSaving(true)
     setError(null)
     try {
-      await api.post('/admin/teams', {
+      // Two calls behind one form: the upload endpoint needs an id, and the
+      // id does not exist until the pair is created. Doing it here spares the
+      // admin from creating a pair and then having to edit it to add a photo.
+      const created = await api.post<Team>('/admin/teams', {
         zone_id: Number(zoneId),
         player_one_name: playerOne.trim(),
         player_two_name: playerTwo.trim(),
       })
+      // The pair exists from here on. A failed upload must not look like a
+      // failed creation, or the admin creates the same pair twice.
+      if (photo) {
+        try {
+          await api.upload(`/admin/teams/${created.id}/photo`, photo)
+        } catch (cause) {
+          const detail = cause instanceof Error ? cause.message : 'error desconocido'
+          onDone(`La pareja se creó, pero la foto no se pudo subir (${detail}). Podés agregarla desde Editar.`)
+          return
+        }
+      }
       onDone()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo crear')
@@ -168,6 +190,15 @@ function CreateForm({
             </option>
           ))}
         </Select>
+      </Field>
+
+      <Field label="Foto" hint="Opcional. JPG, PNG o WebP, máximo 5 MB.">
+        <Input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+          className="file:mr-3 file:rounded file:border-0 file:bg-ink-100 file:px-3 file:py-1.5 file:text-sm file:text-ink-700"
+        />
       </Field>
 
       {error && <Alert>{error}</Alert>}

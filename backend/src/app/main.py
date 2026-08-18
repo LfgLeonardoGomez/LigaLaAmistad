@@ -47,4 +47,6 @@ def health():
             "secure": settings.cookie_secure,
         },
         "cors_origins": settings.cors_origin_list,
+        # Whether image uploads will work at all. A boolean, never the keys.
+        "cloudinary": settings.cloudinary_is_configured,
     }

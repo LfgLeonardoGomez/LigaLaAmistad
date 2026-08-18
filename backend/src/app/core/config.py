@@ -1,7 +1,14 @@
+from pathlib import Path
 from typing import Literal
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Anchored to the project and not to the working directory. With a relative
+# ".env", starting the server from anywhere but backend/ loses every setting
+# without a word, and the first symptom is something unrelated — an upload
+# answering 503 because the Cloudinary keys quietly vanished.
+ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 
 # HS256 signs with SHA256, whose block size is 32 bytes. A shorter key weakens
 # the signature, and PyJWT only warns about it.
@@ -11,7 +18,7 @@ MIN_SECRET_KEY_LENGTH = 32
 class Settings(BaseSettings):
     """Application settings, read from environment variables or a local .env file."""
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
 
     # postgresql+psycopg://user:password@host:port/database
     database_url: str = "postgresql+psycopg://liga:liga@localhost:5433/liga"
