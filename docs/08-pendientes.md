@@ -15,37 +15,48 @@ Lo que falta, en orden. Se actualiza a medida que se cierra cada punto.
 El código de ambos lados ya está listo: `railway.json` corre las migraciones y
 levanta el servidor, y el frontend compila para Vercel sin configuración extra.
 
-## 2. Foto y comentario en el resultado de un partido
+## 2. Foto y comentario en el resultado — LISTO
 
-**Prioridad alta, apenas termine el deploy.**
+Implementado y verificado contra PostgreSQL y Cloudinary reales.
 
-Al cargar el resultado de un partido, la organización puede sumar una foto y un
-comentario. La idea es social: que la pareja ganadora pueda cargar la foto del
-partido y un comentario para cargar a la que perdió.
+Al cargar el resultado, la organización puede sumar una foto y un comentario
+de hasta 280 caracteres.
 
-### Qué toca
+### Cómo quedaron las decisiones
 
-Es la primera funcionalidad que cambia el modelo de datos desde el MVP.
+- **Límite del comentario**: 280 caracteres. La constante vive en
+  `matches/models.py` y el frontend la espeja.
+- **Corregir el marcador conserva foto y comentario.** El `PUT` distingue
+  "campo ausente" de "campo en null" mirando `model_fields_set`: si el cuerpo
+  no trae `comment`, se conserva el guardado; si lo trae en `null`, se borra.
+- **Deshacer el resultado los limpia.** El motivo no es estético: un partido
+  que vuelve a `pending` puede cambiar de fecha **y de parejas**, así que una
+  cargada dirigida a una pareja podría terminar mostrándose sobre otro
+  emparejamiento. No sería un dato huérfano, sería un dato falso.
+- **Carpeta propia en Cloudinary**: `partidos-liga-la-amistad`.
+- Consecuencia agregada: comentar y subir foto exigen que el partido esté
+  `played`. Devuelve 400 si no.
 
-- **Modelo**: dos campos nuevos en `Match` (`photo_url`, `comment`) o una tabla
-  aparte si más adelante se quieren varios comentarios por partido. Para el
-  alcance actual, dos campos alcanzan.
-- **Migración**: una revisión de Alembic. Los partidos ya cargados quedan con
-  ambos campos en `null`, así que no hace falta backfill.
-- **API**: `POST` y `PUT` de resultado aceptan los dos campos; `MatchRead` los
-  devuelve. La subida de la foto sigue el mismo camino que la de las parejas:
-  un endpoint aparte que sube a Cloudinary y guarda la URL.
-- **Panel**: los campos se agregan al formulario de resultado que ya existe.
-- **Web pública**: la tarjeta de resultado muestra la foto y el comentario
-  cuando están, y se ve igual que hoy cuando no están.
+### Endpoints
 
-### Decisiones abiertas
+```txt
+POST   /admin/matches/{id}/result          sets + comentario
+PUT    /admin/matches/{id}/result          reemplaza sets, conserva lo demás
+PATCH  /admin/matches/{id}/result          edita solo el comentario
+POST   /admin/matches/{id}/result/photo    sube la foto
+DELETE /admin/matches/{id}/result          deshace todo
+```
 
-- ¿El comentario tiene límite de caracteres? Propuesta: 280.
-- ¿Se puede editar o borrar el comentario después de cargarlo? Hoy `PUT` de
-  resultado reemplaza todo; habría que definir si la foto y el comentario
-  también se reemplazan o si sobreviven a una corrección del marcador.
-- ¿La foto va a la misma carpeta de Cloudinary que las parejas o a una propia?
+### Lo que quedó pendiente de esta funcionalidad
+
+- **La foto no se puede borrar sin deshacer el resultado.** Hoy solo se
+  reemplaza subiendo otra. Falta aceptar `photo_url: null` en el `PATCH`.
+- **El `PATCH` no tiene consumidor en el panel.** El formulario de resultado
+  ya permite editar el comentario, que viaja en el `PUT`. El endpoint existe
+  porque es la API correcta, pero no lo usa nadie todavía.
+- **La foto pública se recorta a 4:3.** Mantiene prolija la grilla, pero una
+  foto muy panorámica o muy vertical pierde bordes. Sin validar con el dueño
+  del producto.
 
 ## 3. Más adelante
 

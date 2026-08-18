@@ -46,7 +46,14 @@ export function ResultForm({
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const filled = rows.filter((row) => row.a !== '' && row.b !== '')
+  const isFilled = (row: SetRow) => row.a !== '' && row.b !== ''
+  const filled = rows.filter(isFilled)
+
+  // Sets are renumbered by position below, so a gap would quietly turn "set 1
+  // and set 3" into "set 1 and set 2" and send scores under the wrong numbers.
+  // Better to refuse than to guess what the admin meant.
+  const firstEmpty = rows.findIndex((row) => !isFilled(row))
+  const hasGap = firstEmpty !== -1 && rows.slice(firstEmpty).some(isFilled)
   const setsWonByA = filled.filter((row) => Number(row.a) > Number(row.b)).length
   const setsWonByB = filled.filter((row) => Number(row.b) > Number(row.a)).length
   const hasTiedSet = filled.some((row) => Number(row.a) === Number(row.b))
@@ -164,8 +171,9 @@ export function ResultForm({
         </div>
       )}
 
-      {hasTiedSet && <Alert>Un set no puede terminar empatado.</Alert>}
-      {!hasTiedSet && filled.length >= 2 && setsWonByA !== 2 && setsWonByB !== 2 && (
+      {hasGap && <Alert>Completá los sets en orden, sin saltear ninguno.</Alert>}
+      {!hasGap && hasTiedSet && <Alert>Un set no puede terminar empatado.</Alert>}
+      {!hasGap && !hasTiedSet && filled.length >= 2 && setsWonByA !== 2 && setsWonByB !== 2 && (
         <Alert>Una pareja tiene que ganar exactamente dos sets.</Alert>
       )}
       {error && <Alert>{error}</Alert>}
@@ -178,7 +186,7 @@ export function ResultForm({
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={saving || filled.length < 2}>
+        <Button type="submit" disabled={saving || hasGap || filled.length < 2}>
           {saving ? 'Guardando…' : match.status === 'played' ? 'Corregir' : 'Cargar resultado'}
         </Button>
       </div>
