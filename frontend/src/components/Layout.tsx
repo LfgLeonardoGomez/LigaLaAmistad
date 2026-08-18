@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
 import { AdminThemeToggle } from '../theme/AdminTheme'
+import { Modal } from './Modal'
+import { PasswordForm } from './PasswordForm'
 import { Button } from './ui'
 
 const NAV_ITEMS = [
@@ -14,6 +17,7 @@ const NAV_ITEMS = [
 
 export function Layout() {
   const { admin, logout } = useAuth()
+  const [changingPassword, setChangingPassword] = useState(false)
 
   return (
     <div className="flex min-h-full flex-col">
@@ -22,7 +26,17 @@ export function Layout() {
           <span className="text-sm font-semibold text-ink-900">Liga La Amistad</span>
 
           <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-ink-500 sm:inline">{admin?.email}</span>
+            {/* Your own password used to live only in the admins list, behind
+                a screen named after managing other people. This is where
+                someone actually looks for it. */}
+            <button
+              type="button"
+              onClick={() => setChangingPassword(true)}
+              title="Cambiar mi contraseña"
+              className="hidden rounded-md px-2 py-1 text-sm text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-700 sm:inline-block"
+            >
+              {admin?.email}
+            </button>
             <AdminThemeToggle />
             <Button variant="secondary" onClick={() => void logout()}>
               Salir
@@ -55,6 +69,16 @@ export function Layout() {
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <Outlet />
       </main>
+
+      {changingPassword && admin && (
+        <Modal title="Cambiar mi contraseña" onClose={() => setChangingPassword(false)}>
+          <PasswordForm
+            admin={admin}
+            onDone={() => setChangingPassword(false)}
+            onCancel={() => setChangingPassword(false)}
+          />
+        </Modal>
+      )}
     </div>
   )
 }

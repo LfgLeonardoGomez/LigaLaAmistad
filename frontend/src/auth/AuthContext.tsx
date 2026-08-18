@@ -28,6 +28,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setChecking(false))
   }, [])
 
+  // Any 401 anywhere means this session is over. Without this the panel keeps
+  // rendering empty screens against an API that is refusing every call.
+  useEffect(() => {
+    const onExpired = () => setAdmin(null)
+    window.addEventListener('liga:session-expired', onExpired)
+    return () => window.removeEventListener('liga:session-expired', onExpired)
+  }, [])
+
   const login = useCallback(async (email: string, password: string) => {
     setAdmin(await api.post<Admin>('/auth/login', { email, password }))
   }, [])

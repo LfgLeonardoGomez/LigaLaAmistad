@@ -6,6 +6,7 @@ import type { Admin } from '../api/types'
 import { useResource } from '../api/useResource'
 import { useAuth } from '../auth/AuthContext'
 import { Modal } from '../components/Modal'
+import { MIN_PASSWORD_LENGTH, PasswordForm } from '../components/PasswordForm'
 import {
   Alert,
   Button,
@@ -130,8 +131,6 @@ export function AdminUsersPage() {
   )
 }
 
-const MIN_PASSWORD_LENGTH = 8
-
 function CreateForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -181,60 +180,6 @@ function CreateForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => 
         </Button>
         <Button type="submit" disabled={saving}>
           {saving ? 'Creando…' : 'Crear'}
-        </Button>
-      </div>
-    </form>
-  )
-}
-
-function PasswordForm({
-  admin,
-  onDone,
-  onCancel,
-}: {
-  admin: Admin
-  onDone: () => void
-  onCancel: () => void
-}) {
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      await api.patch(`/admin/users/${admin.id}`, { password })
-      onDone()
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo cambiar')
-      setSaving(false)
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Field label="Nueva contraseña" hint={`Mínimo ${MIN_PASSWORD_LENGTH} caracteres.`}>
-        <Input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          minLength={MIN_PASSWORD_LENGTH}
-          autoComplete="new-password"
-          required
-          autoFocus
-        />
-      </Field>
-
-      {error && <Alert>{error}</Alert>}
-
-      <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit" disabled={saving}>
-          {saving ? 'Guardando…' : 'Cambiar'}
         </Button>
       </div>
     </form>

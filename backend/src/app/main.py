@@ -34,4 +34,17 @@ app.include_router(sponsors_router)
 
 @app.get("/health", tags=["health"])
 def health():
-    return {"status": "ok"}
+    """Liveness plus the settings that decide whether a session can survive.
+
+    None of this is secret — the cookie attributes are visible in any login
+    response — and having it in one place turns "the panel logs me out on
+    refresh" from a guess into a fact.
+    """
+    return {
+        "status": "ok",
+        "cookie": {
+            "samesite": settings.cookie_samesite,
+            "secure": settings.cookie_secure,
+        },
+        "cors_origins": settings.cors_origin_list,
+    }

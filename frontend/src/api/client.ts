@@ -54,6 +54,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const body = await response.json().catch(() => null)
 
   if (!response.ok) {
+    // A 401 on any call means the session is gone, whatever screen asked for
+    // it. Announcing it here is what stops a dead session from looking like
+    // an empty table.
+    if (response.status === 401) {
+      window.dispatchEvent(new CustomEvent('liga:session-expired'))
+    }
     throw new ApiError(response.status, readDetail(body, `Error ${response.status}`))
   }
 

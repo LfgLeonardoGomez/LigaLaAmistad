@@ -45,8 +45,13 @@ export function useResource<T>(path: string | null): Resource<T> {
       })
       .catch((cause: unknown) => {
         if (cancelled) return
-        // A 401 is handled by the auth layer, not by every screen.
-        if (cause instanceof ApiError && cause.status === 401) return
+        // A 401 already told the auth layer to drop the session, which sends
+        // the panel back to the login screen. Setting an error here too would
+        // flash a message on the way out.
+        if (cause instanceof ApiError && cause.status === 401) {
+          setData(null)
+          return
+        }
         setError(cause instanceof Error ? cause.message : 'Error inesperado')
       })
       .finally(() => {
