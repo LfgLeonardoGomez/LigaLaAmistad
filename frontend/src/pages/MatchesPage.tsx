@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 
 import { api } from '../api/client'
 import type { Match, MatchStatus, Team, Zone } from '../api/types'
-import { teamName } from '../api/types'
+import { VENUE_LABELS, formatTime, teamName, venueLabel } from '../api/types'
 import { useResource } from '../api/useResource'
 import { Modal } from '../components/Modal'
 import {
@@ -41,6 +41,7 @@ export function MatchesPage() {
   const zones = useResource<Zone[]>('/public/zones')
 
   const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<Match | null>(null)
   const [loadingResult, setLoadingResult] = useState<Match | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -102,6 +103,7 @@ export function MatchesPage() {
               <tr>
                 <Th>Fecha</Th>
                 <Th>Partido</Th>
+                <Th>Lugar</Th>
                 <Th>Resultado</Th>
                 <Th>Estado</Th>
                 <Th className="text-right">Acciones</Th>
@@ -110,7 +112,14 @@ export function MatchesPage() {
           >
             {matches.data.map((match) => (
               <tr key={match.id} className="hover:bg-ink-50">
-                <Td className="whitespace-nowrap text-ink-600">{match.date}</Td>
+                <Td className="whitespace-nowrap text-ink-600">
+                  <div className="flex flex-col gap-0.5">
+                    <span>{match.date}</span>
+                    {match.time && (
+                      <span className="text-xs text-ink-500">{formatTime(match.time)}</span>
+                    )}
+                  </div>
+                </Td>
                 <Td>
                   <div className="flex flex-col gap-0.5">
                     <Side
@@ -122,6 +131,9 @@ export function MatchesPage() {
                       winner={match.winner_team_id === match.team_b_id}
                     />
                   </div>
+                </Td>
+                <Td className="whitespace-nowrap text-ink-600">
+                  {venueLabel(match.venue) ?? '—'}
                 </Td>
                 <Td className="whitespace-nowrap font-mono text-xs text-ink-600">
                   {match.sets.length === 0
@@ -149,15 +161,20 @@ export function MatchesPage() {
                         Deshacer
                       </Button>
                     ) : (
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          if (!confirm('¿Eliminar el partido?')) return
-                          void run(() => api.delete(`/admin/matches/${match.id}`))
-                        }}
-                      >
-                        Eliminar
-                      </Button>
+                      <>
+                        <Button variant="ghost" onClick={() => setEditing(match)}>
+                          Editar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            if (!confirm('¿Eliminar el partido?')) return
+                            void run(() => api.delete(`/admin/matches/${match.id}`))
+                          }}
+                        >
+                          Eliminar
+                        </Button>
+                      </>
                     )}
                   </div>
                 </Td>
@@ -177,6 +194,19 @@ export function MatchesPage() {
               matches.reload()
             }}
             onCancel={() => setCreating(false)}
+          />
+        </Modal>
+      )}
+
+      {editing && (
+        <Modal title="Editar partido" onClose={() => setEditing(null)}>
+          <EditForm
+            match={editing}
+            onDone={() => {
+              setEditing(null)
+              matches.reload()
+            }}
+            onCancel={() => setEditing(null)}
           />
         </Modal>
       )}
@@ -226,6 +256,8 @@ function CreateForm({
   const [teamA, setTeamA] = useState('')
   const [teamB, setTeamB] = useState('')
   const [date, setDate] = useState('')
+  const [time, setTime] = useState('')
+  const [venue, setVenue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -242,6 +274,10 @@ function CreateForm({
         team_a_id: Number(teamA),
         team_b_id: Number(teamB),
         date,
+        // Both are optional: an empty field means "still to be agreed", which
+        // the API stores as null, not as an empty string.
+        time: time || null,
+        venue: venue || null,
       })
       onDone()
     } catch (cause) {
@@ -297,6 +333,13 @@ function CreateForm({
         <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
       </Field>
 
+      <ScheduleFields
+        time={time}
+        venue={venue}
+        onTimeChange={setTime}
+        onVenueChange={setVenue}
+      />
+
       {error && <Alert>{error}</Alert>}
 
       <div className="flex justify-end gap-2 pt-2">
@@ -305,6 +348,109 @@ function CreateForm({
         </Button>
         <Button type="submit" disabled={saving}>
           {saving ? 'Guardando…' : 'Crear'}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+/**
+ * Time and venue, shared by the create and the edit form. Both are optional:
+ * a match is scheduled before the pairs agree on where and at what time, so
+ * the select starts at "Sin definir" and stays there without complaining.
+ */
+function ScheduleFields({
+  time,
+  venue,
+  onTimeChange,
+  onVenueChange,
+}: {
+  time: string
+  venue: string
+  onTimeChange: (value: string) => void
+  onVenueChange: (value: string) => void
+}) {
+  return (
+    <>
+      <Field label="Hora" hint="Opcional. Se puede cargar después, cuando las parejas la arreglen.">
+        <Input type="time" value={time} onChange={(event) => onTimeChange(event.target.value)} />
+      </Field>
+
+      <Field label="Lugar" hint="Opcional. Uno de los clubes de la liga.">
+        <Select value={venue} onChange={(event) => onVenueChange(event.target.value)}>
+          <option value="">Sin definir</option>
+          {Object.entries(VENUE_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </>
+  )
+}
+
+/**
+ * Corrects the date, the time and the venue of a pending match.
+ *
+ * It leaves the pairs alone: swapping them is building another match, and
+ * deleting this one and creating it again says that far more clearly.
+ */
+function EditForm({
+  match,
+  onDone,
+  onCancel,
+}: {
+  match: Match
+  onDone: () => void
+  onCancel: () => void
+}) {
+  const [date, setDate] = useState(match.date)
+  // The API answers `HH:MM:SS` and `<input type="time">` wants `HH:MM`.
+  const [time, setTime] = useState(formatTime(match.time) ?? '')
+  const [venue, setVenue] = useState(match.venue ?? '')
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    setSaving(true)
+    setError(null)
+    try {
+      // An explicit null is what erases a time or a venue already loaded.
+      await api.patch(`/admin/matches/${match.id}`, {
+        date,
+        time: time || null,
+        venue: venue || null,
+      })
+      onDone()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo guardar el partido')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Field label="Fecha">
+        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+      </Field>
+
+      <ScheduleFields
+        time={time}
+        venue={venue}
+        onTimeChange={setTime}
+        onVenueChange={setVenue}
+      />
+
+      {error && <Alert>{error}</Alert>}
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? 'Guardando…' : 'Guardar'}
         </Button>
       </div>
     </form>

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import type { Match, Sponsor, Team, Zone } from '../api/types'
+import { formatTime, venueLabel } from '../api/types'
 import { useResource } from '../api/useResource'
 import { MatchDetail } from './MatchDetail'
 import { Notice, PublicModal, TeamAvatar, formatDate } from './parts'
@@ -362,7 +363,11 @@ function Trophy() {
 }
 
 /**
- * A match that has not been played yet: who plays and when, and nothing else.
+ * A match that has not been played yet: who plays, when and where.
+ *
+ * The time and the venue are optional, so the card says what it knows. With no
+ * time agreed it falls back to the line it always showed, which is the honest
+ * answer rather than an empty slot.
  *
  * Not clickable, unlike a played one. There is no score, no photo and no jab
  * to open — a dialog would promise something that does not exist yet.
@@ -379,6 +384,8 @@ function UpcomingCard({
   const teamA = teamsById.get(match.team_a_id)
   const teamB = teamsById.get(match.team_b_id)
   const zoneName = zones.find((zone) => zone.id === teamA?.zone_id)?.name
+  const startTime = formatTime(match.time)
+  const venue = venueLabel(match.venue)
 
   return (
     <article className="card p-4">
@@ -387,8 +394,12 @@ function UpcomingCard({
         style={{ color: 'var(--color-fg-muted)' }}
       >
         <span>{zoneName ?? '—'}</span>
-        <time dateTime={match.date} style={{ color: 'var(--color-accent)' }}>
+        <time
+          dateTime={match.time ? `${match.date}T${match.time}` : match.date}
+          style={{ color: 'var(--color-accent)' }}
+        >
           {formatDate(match.date)}
+          {startTime && ` · ${startTime}`}
         </time>
       </div>
 
@@ -401,9 +412,15 @@ function UpcomingCard({
         </div>
       ))}
 
-      <p className="mt-3 text-[11px]" style={{ color: 'var(--color-fg-muted)' }}>
-        La hora la arreglan las parejas.
-      </p>
+      {/* The hour rides with the date up top, so this line carries the club,
+          and the old promise only while there is no hour to promise. */}
+      {(venue || !startTime) && (
+        <p className="mt-3 text-[11px]" style={{ color: 'var(--color-fg-muted)' }}>
+          {venue && <span style={{ color: 'var(--color-fg)' }}>{venue}</span>}
+          {venue && !startTime && <span aria-hidden="true"> · </span>}
+          {!startTime && 'La hora la arreglan las parejas.'}
+        </p>
+      )}
     </article>
   )
 }

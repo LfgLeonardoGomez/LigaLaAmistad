@@ -28,6 +28,10 @@ export interface Match {
   team_a_id: number
   team_b_id: number
   date: string
+  /** `HH:MM:SS`, or null while the pairs have not agreed on one. */
+  time: string | null
+  /** A key of VENUE_LABELS, or null while the club is not decided. */
+  venue: string | null
   status: MatchStatus
   sets: MatchSet[]
   winner_team_id: number | null
@@ -37,6 +41,35 @@ export interface Match {
 
 /** Mirrors COMMENT_MAX_LENGTH in backend/src/app/matches/models.py. */
 export const COMMENT_MAX_LENGTH = 280
+
+/**
+ * The clubs of `MatchVenue` in backend/src/app/matches/models.py, with the
+ * label the site shows. Declared once: the form, the panel table and the
+ * public cards all read the name from here, so no club gets two spellings.
+ */
+export const VENUE_LABELS: Record<string, string> = {
+  boss_padel: 'Boss Pádel',
+  cofam: 'Cofam',
+  arena: 'Arena',
+  indoor: 'Indoor',
+  padelon: 'Padelón',
+  punto_de_oro: 'Punto de Oro',
+  otro: 'Otro',
+}
+
+/** The club's name, or null when there is none to show. */
+export function venueLabel(venue: string | null): string | null {
+  if (!venue) return null
+  // A venue the front end does not know yet is shown raw rather than hidden:
+  // a new club added to the API is still better information than nothing.
+  return VENUE_LABELS[venue] ?? venue
+}
+
+/** `HH:MM:SS` as `HH:MM`. Seconds are noise in a fixture. */
+export function formatTime(time: string | null): string | null {
+  if (!time) return null
+  return time.slice(0, 5)
+}
 
 export interface Sponsor {
   id: number

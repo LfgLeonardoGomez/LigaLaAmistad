@@ -20,6 +20,23 @@ class MatchStatus(str, enum.Enum):
     PLAYED = "played"
 
 
+class MatchVenue(str, enum.Enum):
+    """The clubs the league plays at.
+
+    A closed list and not free text: the venue is read at a glance on the home
+    page, and "Boss", "boss padel" and "Bos Padel" would be three clubs there.
+    `OTHER` is the escape hatch for the odd court nobody plays at twice.
+    """
+
+    BOSS_PADEL = "boss_padel"
+    COFAM = "cofam"
+    ARENA = "arena"
+    INDOOR = "indoor"
+    PADELON = "padelon"
+    PUNTO_DE_ORO = "punto_de_oro"
+    OTHER = "otro"
+
+
 class Match(TimestampMixin, table=True):
     """A match between two teams.
 
@@ -29,6 +46,10 @@ class Match(TimestampMixin, table=True):
 
     `photo_url` and `comment` hang off the result, not off the scoreboard: a
     correction of the marker keeps them, undoing the result drops them.
+
+    `time` and `venue` are optional: a match is scheduled before the pairs
+    agree on where and at what time, and the matches already loaded have
+    neither.
     """
 
     __tablename__ = "matches"
@@ -40,6 +61,20 @@ class Match(TimestampMixin, table=True):
     team_a_id: int = Field(foreign_key="teams.id", index=True)
     team_b_id: int = Field(foreign_key="teams.id", index=True)
     date: datetime.date = Field(index=True)
+    time: datetime.time | None = Field(default=None)
+    venue: MatchVenue | None = Field(
+        default=None,
+        sa_column=Column(
+            SAEnum(
+                MatchVenue,
+                name="match_venue",
+                # Without this, Postgres would store the member NAME
+                # (`BOSS_PADEL`) instead of the value the API speaks.
+                values_callable=lambda members: [member.value for member in members],
+            ),
+            nullable=True,
+        ),
+    )
     status: MatchStatus = Field(
         default=MatchStatus.PENDING,
         sa_column=Column(
