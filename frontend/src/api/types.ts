@@ -30,8 +30,12 @@ export interface Match {
   date: string
   /** `HH:MM:SS`, or null while the pairs have not agreed on one. */
   time: string | null
-  /** A key of VENUE_LABELS, or null while the club is not decided. */
-  venue: string | null
+  /**
+   * The club, or null while it is not decided. `string` stays in the union on
+   * purpose: it keeps autocomplete for the clubs we know while still accepting
+   * one the API adds before this file catches up.
+   */
+  venue: MatchVenue | (string & {}) | null
   status: MatchStatus
   sets: MatchSet[]
   winner_team_id: number | null
@@ -42,12 +46,26 @@ export interface Match {
 /** Mirrors COMMENT_MAX_LENGTH in backend/src/app/matches/models.py. */
 export const COMMENT_MAX_LENGTH = 280
 
+/** The clubs of `MatchVenue` in backend/src/app/matches/models.py. */
+export type MatchVenue =
+  | 'boss_padel'
+  | 'cofam'
+  | 'arena'
+  | 'indoor'
+  | 'padelon'
+  | 'punto_de_oro'
+  | 'otro'
+
 /**
- * The clubs of `MatchVenue` in backend/src/app/matches/models.py, with the
- * label the site shows. Declared once: the form, the panel table and the
- * public cards all read the name from here, so no club gets two spellings.
+ * The label the site shows for each club. Declared once: the form, the panel
+ * table and the public cards all read the name from here, so no club gets two
+ * spellings.
+ *
+ * Typing it against `MatchVenue` rather than `string` is what keeps the two
+ * lists from drifting: adding a club to the union without a label here stops
+ * compiling.
  */
-export const VENUE_LABELS: Record<string, string> = {
+export const VENUE_LABELS: Record<MatchVenue, string> = {
   boss_padel: 'Boss Pádel',
   cofam: 'Cofam',
   arena: 'Arena',
@@ -62,7 +80,7 @@ export function venueLabel(venue: string | null): string | null {
   if (!venue) return null
   // A venue the front end does not know yet is shown raw rather than hidden:
   // a new club added to the API is still better information than nothing.
-  return VENUE_LABELS[venue] ?? venue
+  return VENUE_LABELS[venue as MatchVenue] ?? venue
 }
 
 /** `HH:MM:SS` as `HH:MM`. Seconds are noise in a fixture. */
