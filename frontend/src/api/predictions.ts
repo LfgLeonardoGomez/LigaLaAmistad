@@ -76,3 +76,34 @@ export function usePoll() {
 
   return { state, submit }
 }
+
+/**
+ * The counts, once the poll has closed.
+ *
+ * `enabled` is what keeps a running poll from asking: while it is open the API
+ * answers 409 on purpose, and there is nothing to show.
+ */
+export function usePollResults(enabled: boolean) {
+  const [results, setResults] = useState<PollResults | null>(null)
+
+  useEffect(() => {
+    if (!enabled) {
+      setResults(null)
+      return
+    }
+
+    let cancelled = false
+    api
+      .get<PollResults>('/public/predictions/results')
+      .then((result) => {
+        if (!cancelled) setResults(result)
+      })
+      .catch(() => undefined)
+
+    return () => {
+      cancelled = true
+    }
+  }, [enabled])
+
+  return results
+}
