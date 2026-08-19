@@ -212,10 +212,10 @@ function Group({
           {empty}
         </p>
       ) : (
-        <ul className="grid gap-2">
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {fixtures.map(({ rival, match }) => (
-            <li key={rival.id}>
-              <FixtureRow rival={rival} match={match} team={team} />
+            <li key={rival.id} className="min-w-0">
+              <FixtureCard rival={rival} match={match} team={team} />
             </li>
           ))}
         </ul>
@@ -224,7 +224,7 @@ function Group({
   )
 }
 
-function FixtureRow({ rival, match, team }: { rival: Team; match: Match | null; team: Team }) {
+function FixtureCard({ rival, match, team }: { rival: Team; match: Match | null; team: Team }) {
   const setsWonBy = (teamId: number) =>
     (match?.sets ?? []).filter((set) =>
       teamId === match?.team_a_id
@@ -240,35 +240,44 @@ function FixtureRow({ rival, match, team }: { rival: Team; match: Match | null; 
     : null
 
   return (
-    <div className="card flex items-center gap-3 px-3 py-2.5">
-      <TeamAvatar team={rival} size={26} />
+    <div className="card flex h-full flex-col gap-3 p-3">
+      <div className="flex items-center gap-2.5">
+        <TeamAvatar team={rival} size={38} />
+        {/* Un nombre por renglon: en una tarjeta angosta "Fulano / Mengano"
+            se truncaba justo donde importa. */}
+        <span className="min-w-0 flex-1 text-sm leading-tight">
+          <span className="block truncate">{rival.player_one_name}</span>
+          <span className="block truncate">{rival.player_two_name}</span>
+        </span>
+      </div>
 
-      <span className="min-w-0 flex-1 truncate text-sm">
-        {rival.player_one_name} / {rival.player_two_name}
-      </span>
-
+      {/* `mt-auto` empuja el pie al fondo, asi el marcador queda alineado
+          entre tarjetas de distinta altura dentro de la misma fila. */}
       {match?.status === 'played' ? (
-        <span className="flex flex-none items-center gap-2">
+        <div
+          className="mt-auto flex items-center justify-between gap-2 border-t pt-2"
+          style={{ borderColor: 'var(--color-rule)' }}
+        >
           <span
             className="text-[10px] font-bold tracking-wider uppercase"
             style={{ color: won ? 'var(--color-accent)' : 'var(--color-fg-muted)' }}
           >
             {won ? 'Ganaron' : 'Perdieron'}
           </span>
-          <span className="text-sm font-semibold tabular-nums">
+          <span className="text-base font-semibold tabular-nums">
             {setsWonBy(team.id)}-{setsWonBy(rival.id)}
           </span>
-        </span>
+        </div>
       ) : (
         // Sin partido no se dice nada: el titulo del grupo ya explica que ese
-        // cruce esta sin acordar, y repetirlo por fila solo agrega ruido.
+        // cruce esta sin acordar, y repetirlo por tarjeta solo agrega ruido.
         schedule && (
-          <span
-            className="flex-none text-right text-[11px]"
-            style={{ color: 'var(--color-fg-muted)' }}
+          <div
+            className="mt-auto border-t pt-2 text-[11px]"
+            style={{ borderColor: 'var(--color-rule)', color: 'var(--color-fg-muted)' }}
           >
             {schedule}
-          </span>
+          </div>
         )
       )}
     </div>
