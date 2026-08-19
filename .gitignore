@@ -13,6 +13,9 @@ dist/
 *.log
 npm-debug.log*
 
+# Cache incremental de TypeScript: se regenera en cada build
+*.tsbuildinfo
+
 # Variables de entorno
 .env
 .env.*
