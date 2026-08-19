@@ -5,6 +5,7 @@ import { LoginPage } from './auth/LoginPage'
 import { Layout } from './components/Layout'
 import { AdminUsersPage } from './pages/AdminUsersPage'
 import { MatchesPage } from './pages/MatchesPage'
+import { PredictionsPage } from './pages/PredictionsPage'
 import { SponsorsPage } from './pages/SponsorsPage'
 import { StandingsPage } from './pages/StandingsPage'
 import { TeamsPage } from './pages/TeamsPage'
@@ -67,6 +68,7 @@ export function App() {
             <Route path="partidos" element={<MatchesPage />} />
             <Route path="tabla" element={<StandingsPage />} />
             <Route path="sponsors" element={<SponsorsPage />} />
+            <Route path="encuesta" element={<PredictionsPage />} />
             <Route path="administradores" element={<AdminUsersPage />} />
           </Route>
         </Route>

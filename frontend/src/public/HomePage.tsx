@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom'
 
 import type { Match, Sponsor, Team, Zone } from '../api/types'
 import { formatTime, venueLabel } from '../api/types'
+import { usePoll } from '../api/predictions'
 import { useResource } from '../api/useResource'
 import type { VoteTally } from '../api/votes'
+import { PredictionBanner } from './PredictionBanner'
 import { useMatchVotes } from '../api/votes'
 import { MatchDetail } from './MatchDetail'
-import { MatchVoting } from './MatchVoting'
+import { UpcomingVote } from './UpcomingVote'
 import { Notice, PublicModal, TeamAvatar, formatDate } from './parts'
 import { imageUrl } from '../api/images'
 
@@ -53,6 +55,7 @@ export function HomePage() {
   )
 
   const [openMatch, setOpenMatch] = useState<Match | null>(null)
+  const poll = usePoll()
 
   // The API returns played matches oldest first; the home wants the newest.
   const recent = useMemo(() => [...(matches.data ?? [])].reverse().slice(0, 3), [matches.data])
@@ -91,6 +94,15 @@ export function HomePage() {
         teams={teams.data?.length}
         zones={zones.data?.length}
         seasonTotal={teams.data ? seasonMatches(teams.data) : undefined}
+      />
+
+      {/* Straight under the hero: it is the one thing on the home asking the
+          visitor to do something, and it only exists while a poll runs. */}
+      <PredictionBanner
+        poll={poll.state}
+        zones={zones.data ?? []}
+        teams={teams.data ?? []}
+        onSubmit={poll.submit}
       />
 
       <section className="container-page py-[clamp(36px,6vw,64px)]">
@@ -428,26 +440,17 @@ function UpcomingCard({
         </time>
       </div>
 
-      {[teamA, teamB].map((team, index) => (
-        <div key={index} className="flex items-center gap-2.5 py-1">
-          <TeamAvatar team={team} size={24} />
-          <span className="min-w-0 flex-1 truncate text-sm">
-            {team ? `${team.player_one_name} / ${team.player_two_name}` : '—'}
-          </span>
-        </div>
-      ))}
-
-      {/* The hour rides with the date up top, so this line carries the club,
-          and the old promise only while there is no hour to promise. */}
+      {/* Where and when live together above the pairs. Below them there is
+          nothing left to read: the pairs themselves are the buttons. */}
       {(venue || !startTime) && (
-        <p className="mt-3 text-[11px]" style={{ color: 'var(--color-fg-muted)' }}>
+        <p className="-mt-1 mb-1 text-[11px]" style={{ color: 'var(--color-fg-muted)' }}>
           {venue && <span style={{ color: 'var(--color-fg)' }}>{venue}</span>}
           {venue && !startTime && <span aria-hidden="true"> · </span>}
           {!startTime && 'La hora la arreglan las parejas.'}
         </p>
       )}
 
-      <MatchVoting tally={tally} teamA={teamA} teamB={teamB} onVote={onVote} />
+      <UpcomingVote tally={tally} teamA={teamA} teamB={teamB} onVote={onVote} />
     </article>
   )
 }
