@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: '/', label: 'Inicio', end: true },
   { to: '/parejas', label: 'Parejas', end: false },
   { to: '/tabla', label: 'Tabla', end: false },
+  { to: '/cruces', label: 'Cruces', end: false },
   { to: '/resultados', label: 'Resultados', end: false },
 ]
 

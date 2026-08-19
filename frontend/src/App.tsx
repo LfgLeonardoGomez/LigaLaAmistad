@@ -10,6 +10,7 @@ import { StandingsPage } from './pages/StandingsPage'
 import { TeamsPage } from './pages/TeamsPage'
 import { HomePage } from './public/HomePage'
 import { PublicLayout } from './public/PublicLayout'
+import { PublicFixturesPage } from './public/FixturesPage'
 import { PublicResultsPage } from './public/ResultsPage'
 import { PublicStandingsPage } from './public/StandingsPage'
 import { PublicTeamsPage } from './public/TeamsPage'
@@ -43,6 +44,7 @@ export function App() {
           <Route index element={<HomePage />} />
           <Route path="parejas" element={<PublicTeamsPage />} />
           <Route path="tabla" element={<PublicStandingsPage />} />
+          <Route path="cruces" element={<PublicFixturesPage />} />
           <Route path="resultados" element={<PublicResultsPage />} />
         </Route>
 
