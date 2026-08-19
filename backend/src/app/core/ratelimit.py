@@ -34,8 +34,17 @@ def client_key(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def check_rate_limit(key: str, max_attempts: int, window_seconds: int) -> None:
-    """Raise 429 when this key used up its attempts inside the window."""
+def check_rate_limit(
+    key: str,
+    max_attempts: int,
+    window_seconds: int,
+    detail: str = "Too many login attempts. Try again later",
+) -> None:
+    """Raise 429 when this key used up its attempts inside the window.
+
+    `detail` is a parameter because this now guards more than the login: a
+    voter told to slow down should not be read an error about passwords.
+    """
     now = time.monotonic()
     cutoff = now - window_seconds
 
@@ -46,7 +55,7 @@ def check_rate_limit(key: str, max_attempts: int, window_seconds: int) -> None:
         retry_after = int(recent[0] + window_seconds - now) + 1
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many login attempts. Try again later",
+            detail=detail,
             headers={"Retry-After": str(retry_after)},
         )
 
