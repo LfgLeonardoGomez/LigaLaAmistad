@@ -5,6 +5,7 @@ from app.auth.router import admin_users_router
 from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.matches.router import router as matches_router
+from app.predictions.router import router as predictions_router
 from app.public.router import router as public_router
 from app.sponsors.router import router as sponsors_router
 from app.teams.router import router as teams_router
@@ -30,6 +31,7 @@ app.include_router(admin_users_router)
 app.include_router(teams_router)
 app.include_router(matches_router)
 app.include_router(sponsors_router)
+app.include_router(predictions_router)
 
 
 @app.get("/health", tags=["health"])

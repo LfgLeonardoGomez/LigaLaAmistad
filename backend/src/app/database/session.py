@@ -22,6 +22,7 @@ def create_db_and_tables() -> None:
     """
     from app.auth import models as auth_models  # noqa: F401
     from app.matches import models as match_models  # noqa: F401
+    from app.predictions import models as prediction_models  # noqa: F401
     from app.sponsors import models as sponsor_models  # noqa: F401
     from app.teams import models as team_models  # noqa: F401
     from app.votes import models as vote_models  # noqa: F401

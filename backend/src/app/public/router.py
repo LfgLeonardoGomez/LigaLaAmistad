@@ -16,6 +16,8 @@ from app.database.session import SessionDep
 from app.matches import service as match_service
 from app.matches.models import MatchStatus
 from app.matches.schemas import MatchRead
+from app.predictions import service as prediction_service
+from app.predictions.schemas import PollResults, PollState, PredictionIn
 from app.sponsors import service as sponsor_service
 from app.sponsors.schemas import SponsorRead
 from app.standings import service as standings_service
@@ -33,6 +35,9 @@ router = APIRouter(prefix="/public", tags=["public"])
 # tight enough that a script cannot stuff a poll from one address.
 VOTES_PER_WINDOW = 30
 VOTE_WINDOW_SECONDS = 60
+
+# A ballot covers both zones in one call, so nobody legitimately sends many.
+PREDICTIONS_PER_WINDOW = 10
 
 # A page asks for the matches it is showing, which is six on the home and
 # twenty in the results list. The cap is what stops a caller asking for the
@@ -96,6 +101,29 @@ def cast_match_vote(match_id: int, data: VoteIn, request: Request, session: Sess
         detail="Too many votes. Try again later",
     )
     return vote_service.cast_vote(session, match_id, data)
+
+
+@router.get("/predictions", response_model=PollState)
+def prediction_state(session: SessionDep, voter_key: str | None = None):
+    """Whether the season poll is running, and what this device already said."""
+    return prediction_service.state(session, voter_key)
+
+
+@router.post("/predictions", response_model=PollState)
+def submit_prediction(data: PredictionIn, request: Request, session: SessionDep):
+    check_rate_limit(
+        f"prediction:{client_key(request)}",
+        PREDICTIONS_PER_WINDOW,
+        VOTE_WINDOW_SECONDS,
+        detail="Too many attempts. Try again later",
+    )
+    return prediction_service.submit(session, data)
+
+
+@router.get("/predictions/results", response_model=PollResults)
+def prediction_results(session: SessionDep):
+    """409 while the poll is open: the counts are the reason to wait."""
+    return prediction_service.results(session)
 
 
 @router.get("/standings", response_model=list[StandingRead])
