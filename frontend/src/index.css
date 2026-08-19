@@ -357,6 +357,51 @@ body {
   }
 }
 
+/* --- Nav that scrolls -----------------------------------------------------
+
+   On a narrow phone the five tabs do not fit and the nav scrolls. A scroller
+   with a hard edge looks like a nav that simply ends, so the last tab is never
+   found. The fade is the affordance: it says there is more that way.
+
+   Only the side with hidden content is faded, driven by `useScrollEdges`, so
+   a nav that fits keeps both edges crisp.
+--------------------------------------------------------------------------- */
+.nav-fade {
+  /* The bar is the affordance; a scrollbar on top of it is noise. */
+  scrollbar-width: none;
+}
+
+.nav-fade::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-fade[data-fade-end] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+
+.nav-fade[data-fade-start] {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
+}
+
+.nav-fade[data-fade-start][data-fade-end] {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 28px,
+    #000 calc(100% - 28px),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 28px,
+    #000 calc(100% - 28px),
+    transparent
+  );
+}
+
 /* Cards share one radius so a page does not mix rounded and square corners.
    Tables stay square: rounding a data grid only blurs its edges. */
 .card {

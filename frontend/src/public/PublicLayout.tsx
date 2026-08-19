@@ -1,6 +1,46 @@
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 import { ThemeToggle } from '../theme/ThemeToggle'
+
+/**
+ * Which edges of a horizontal scroller still hide content.
+ *
+ * On a narrow phone the nav scrolls, and nothing tells the reader that there
+ * are more tabs past the edge. This is what lets the CSS fade exactly the side
+ * that has something left to reveal, instead of dimming an edge for no reason.
+ */
+function useScrollEdges<T extends HTMLElement>() {
+  const ref = useRef<T>(null)
+  const [edges, setEdges] = useState({ start: false, end: false })
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element) return
+
+    const update = () => {
+      const max = element.scrollWidth - element.clientWidth
+      // The 1px slack absorbs the fractional scroll positions a zoomed or
+      // high-DPI viewport produces, which would otherwise fade a nav that is
+      // already at its end.
+      setEdges({ start: element.scrollLeft > 1, end: element.scrollLeft < max - 1 })
+    }
+
+    update()
+    element.addEventListener('scroll', update, { passive: true })
+    // A resize changes what fits, so the fade has to be recomputed on rotation
+    // and on the breakpoints that grow the type.
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+
+    return () => {
+      element.removeEventListener('scroll', update)
+      observer.disconnect()
+    }
+  }, [])
+
+  return [ref, edges] as const
+}
 
 const NAV_ITEMS = [
   { to: '/', label: 'Inicio', end: true },
@@ -11,6 +51,8 @@ const NAV_ITEMS = [
 ]
 
 export function PublicLayout() {
+  const [navRef, navEdges] = useScrollEdges<HTMLElement>()
+
   return (
     <div className="public-shell flex min-h-full flex-col">
       <header
@@ -24,14 +66,22 @@ export function PublicLayout() {
           {/* `flex-none`, no `min-w-0`: con cinco items el nav no cede ancho y
               antes aplastaba la marca hasta dejarla en cero, con el texto
               desbordando encima. El que se adapta es el nav, no la marca. */}
-          <NavLink to="/" className="flex flex-none items-center gap-2.5">
+          <NavLink
+            to="/"
+            aria-label="Liga La Amistad, ir al inicio"
+            className="flex flex-none items-center gap-2.5"
+          >
             <span
               className="display grid h-[34px] w-[34px] flex-none place-items-center rounded-full text-sm"
               style={{ border: '2px solid var(--color-accent)', color: 'var(--color-accent)' }}
             >
               LA
             </span>
-            <span className="display text-[13px] leading-tight sm:text-[15px]">
+            {/* En mobile queda solo el circulo: los 100px que libera el nombre
+                son los que necesitan las cinco pestanas para entrar. No se
+                pierde identidad, el circulo ya la lleva y la home la repite
+                entera en el hero. El nombre vuelve donde hay lugar. */}
+            <span className="display hidden text-[13px] leading-tight sm:block sm:text-[15px]">
               Liga
               <br />
               La Amistad
@@ -41,14 +91,19 @@ export function PublicLayout() {
           <div className="flex min-w-0 flex-1 items-center justify-end gap-4">
             {/* Si los items no entran, el nav scrollea en lugar de invadir la
                 marca. Es el mismo patron que ya usa el panel de admin. */}
-            <nav className="min-w-0 overflow-x-auto">
-              <ul className="flex items-center gap-3 sm:gap-5">
+            <nav
+              ref={navRef}
+              className="nav-fade min-w-0 overflow-x-auto"
+              data-fade-start={navEdges.start || undefined}
+              data-fade-end={navEdges.end || undefined}
+            >
+              <ul className="flex items-center gap-2 sm:gap-3 lg:gap-5">
                 {NAV_ITEMS.map((item) => (
                   <li key={item.to}>
                     <NavLink
                       to={item.to}
                       end={item.end}
-                      className="display text-[11px] whitespace-nowrap sm:text-[13px]"
+                      className="display text-[11px] whitespace-nowrap lg:text-[13px]"
                       style={({ isActive }) => ({
                         color: isActive ? 'var(--color-accent)' : 'var(--color-fg)',
                         borderBottom: isActive
@@ -63,7 +118,9 @@ export function PublicLayout() {
                 ))}
               </ul>
             </nav>
-            <div className="hidden sm:block">
+            {/* Recien en `lg` hay lugar para marca + nav + selector a la vez.
+                Mostrarlo desde `sm` era lo que reventaba el nav en tablet. */}
+            <div className="hidden lg:block">
               <ThemeToggle />
             </div>
           </div>
@@ -85,7 +142,7 @@ export function PublicLayout() {
             <span style={{ color: 'var(--color-fg-muted)' }}>
               Pádel amateur · Dos zonas · Al mejor de tres sets
             </span>
-            <div className="sm:hidden">
+            <div className="lg:hidden">
               <ThemeToggle />
             </div>
           </div>
