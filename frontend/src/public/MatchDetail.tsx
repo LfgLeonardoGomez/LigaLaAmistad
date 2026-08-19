@@ -1,6 +1,8 @@
 import type { Match, Team, Zone } from '../api/types'
 import { formatTime, venueLabel } from '../api/types'
+import type { VoteTally } from '../api/votes'
 import { imageUrl } from '../api/images'
+import { MatchVoting } from './MatchVoting'
 import { TeamAvatar, formatDate } from './parts'
 
 /**
@@ -15,12 +17,15 @@ export function MatchDetail({
   teamsById,
   zones,
   interactive = false,
+  tally,
 }: {
   match: Match
   teamsById: Map<number, Team>
   zones: Zone[]
   /** Adds the hover lift. Off inside a dialog, where nothing is clickable. */
   interactive?: boolean
+  /** How the public voted before it was played. Absent means nobody did. */
+  tally?: VoteTally
 }) {
   const teamA = teamsById.get(match.team_a_id)
   const teamB = teamsById.get(match.team_b_id)
@@ -87,6 +92,20 @@ export function MatchDetail({
         >
           {match.comment}
         </p>
+      )}
+
+      {/* What the public predicted, next to what actually happened. Renders
+          nothing when nobody voted, so a match from before the feature looks
+          exactly as it did. */}
+      {tally && tally.total > 0 && (
+        <div className="px-3 pb-3">
+          <MatchVoting
+            tally={tally}
+            teamA={teamA}
+            teamB={teamB}
+            winnerTeamId={match.winner_team_id}
+          />
+        </div>
       )}
     </article>
   )

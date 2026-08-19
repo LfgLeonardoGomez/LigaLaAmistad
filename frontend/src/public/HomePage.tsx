@@ -4,7 +4,10 @@ import { Link } from 'react-router-dom'
 import type { Match, Sponsor, Team, Zone } from '../api/types'
 import { formatTime, venueLabel } from '../api/types'
 import { useResource } from '../api/useResource'
+import type { VoteTally } from '../api/votes'
+import { useMatchVotes } from '../api/votes'
 import { MatchDetail } from './MatchDetail'
+import { MatchVoting } from './MatchVoting'
 import { Notice, PublicModal, TeamAvatar, formatDate } from './parts'
 import { imageUrl } from '../api/images'
 
@@ -66,6 +69,21 @@ export function HomePage() {
   // Two rows of three: enough to cover a normal week of the league without
   // turning the home into the whole fixture list.
   const next = useMemo(() => pending.slice(0, UPCOMING_SHOWN), [pending])
+
+  // Every match on screen in one request: the fixtures to vote on, and the
+  // recent ones so the dialog can show how the vote went.
+  //
+  // Held back until both lists have landed. They resolve at different moments,
+  // and asking as each one arrives costs two requests to answer one question.
+  const votes = useMatchVotes(
+    useMemo(
+      () =>
+        matches.loading || upcoming.loading
+          ? []
+          : [...next, ...recent].map((match) => match.id),
+      [matches.loading, upcoming.loading, next, recent],
+    ),
+  )
 
   return (
     <>
@@ -134,6 +152,8 @@ export function HomePage() {
                 match={match}
                 teamsById={teamsById}
                 zones={zones.data ?? []}
+                tally={votes.tallies.get(match.id)}
+                onVote={(teamId) => votes.vote(match.id, teamId)}
               />
             ))}
           </div>
@@ -182,6 +202,7 @@ export function HomePage() {
             match={openMatch}
             teamsById={teamsById}
             zones={zones.data ?? []}
+            tally={votes.tallies.get(openMatch.id)}
           />
         </PublicModal>
       )}
@@ -376,10 +397,14 @@ function UpcomingCard({
   match,
   teamsById,
   zones,
+  tally,
+  onVote,
 }: {
   match: Match
   teamsById: Map<number, Team>
   zones: Zone[]
+  tally: VoteTally | undefined
+  onVote: (teamId: number) => Promise<void>
 }) {
   const teamA = teamsById.get(match.team_a_id)
   const teamB = teamsById.get(match.team_b_id)
@@ -421,6 +446,8 @@ function UpcomingCard({
           {!startTime && 'La hora la arreglan las parejas.'}
         </p>
       )}
+
+      <MatchVoting tally={tally} teamA={teamA} teamB={teamB} onVote={onVote} />
     </article>
   )
 }

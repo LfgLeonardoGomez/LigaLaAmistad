@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import type { Match, Team, Zone } from '../api/types'
 import { useResource } from '../api/useResource'
+import { useMatchVotes } from '../api/votes'
 import { MatchDetail } from './MatchDetail'
 import { Notice, PageTitle, Pagination, ZoneTabs } from './parts'
 
@@ -30,6 +31,10 @@ export function PublicResultsPage() {
   useEffect(() => setPage(1), [zoneId])
 
   const visible = newestFirst.slice((page - 1) * PER_PAGE, page * PER_PAGE)
+
+  // Only the page on screen, so turning the page asks for twenty tallies and
+  // not for the whole season.
+  const votes = useMatchVotes(useMemo(() => visible.map((match) => match.id), [visible]))
 
   return (
     <div className="container-page">
@@ -62,7 +67,13 @@ export function PublicResultsPage() {
                 long pair of names would push the page sideways on a phone. */}
             {visible.map((match) => (
               <li key={match.id} className="min-w-0">
-                <MatchDetail interactive match={match} teamsById={teamsById} zones={zones.data ?? []} />
+                <MatchDetail
+                  interactive
+                  match={match}
+                  teamsById={teamsById}
+                  zones={zones.data ?? []}
+                  tally={votes.tallies.get(match.id)}
+                />
               </li>
             ))}
           </ul>
