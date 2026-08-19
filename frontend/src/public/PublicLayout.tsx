@@ -21,7 +21,10 @@ export function PublicLayout() {
         }}
       >
         <div className="mx-auto flex w-full max-w-[1180px] items-center justify-between gap-4 px-4 py-3.5 sm:px-8">
-          <NavLink to="/" className="flex min-w-0 items-center gap-2.5">
+          {/* `flex-none`, no `min-w-0`: con cinco items el nav no cede ancho y
+              antes aplastaba la marca hasta dejarla en cero, con el texto
+              desbordando encima. El que se adapta es el nav, no la marca. */}
+          <NavLink to="/" className="flex flex-none items-center gap-2.5">
             <span
               className="display grid h-[34px] w-[34px] flex-none place-items-center rounded-full text-sm"
               style={{ border: '2px solid var(--color-accent)', color: 'var(--color-accent)' }}
@@ -35,8 +38,10 @@ export function PublicLayout() {
             </span>
           </NavLink>
 
-          <div className="flex items-center gap-4">
-            <nav>
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-4">
+            {/* Si los items no entran, el nav scrollea en lugar de invadir la
+                marca. Es el mismo patron que ya usa el panel de admin. */}
+            <nav className="min-w-0 overflow-x-auto">
               <ul className="flex items-center gap-3 sm:gap-5">
                 {NAV_ITEMS.map((item) => (
                   <li key={item.to}>
