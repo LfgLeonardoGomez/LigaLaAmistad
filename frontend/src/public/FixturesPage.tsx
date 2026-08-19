@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Match, Team, Zone } from '../api/types'
 import { formatTime, venueLabel } from '../api/types'
@@ -10,6 +10,8 @@ interface Fixture {
   rival: Team
   match: Match | null
 }
+
+type Step = 'zone' | 'team' | 'detail'
 
 export function PublicFixturesPage() {
   const zones = useResource<Zone[]>('/public/zones')
@@ -24,7 +26,13 @@ export function PublicFixturesPage() {
     zoneId === null ? null : `/public/matches?status=pending&zone_id=${zoneId}`,
   )
 
+  const zone = zones.data?.find((z) => z.id === zoneId) ?? null
   const team = teams.data?.find((t) => t.id === teamId) ?? null
+
+  // One step at a time, each replacing the one before. Stacked, the answer
+  // landed below the fold and a reader who did not scroll thought the tap had
+  // done nothing.
+  const step: Step = zoneId === null ? 'zone' : team === null ? 'team' : 'detail'
 
   const fixtures = useMemo<Fixture[]>(() => {
     if (!team || !teams.data) return []
@@ -47,9 +55,25 @@ export function PublicFixturesPage() {
       .map((rival) => ({ rival, match: byRival.get(rival.id) ?? null }))
   }, [team, teams.data, played.data, scheduled.data])
 
-  const done = fixtures.filter((f) => f.match?.status === 'played')
-  const booked = fixtures.filter((f) => f.match?.status === 'pending')
-  const unarranged = fixtures.filter((f) => f.match === null)
+  const heading =
+    step === 'zone'
+      ? 'Elegí una zona'
+      : step === 'team'
+        ? `Elegí una pareja de ${zone?.name ?? ''}`.trimEnd()
+        : `${team?.player_one_name} / ${team?.player_two_name}`
+
+  // Focus follows the step so the change is announced to a screen reader and
+  // the keyboard caret lands on the new content. Skipped on first paint: a
+  // page that steals focus on load is worse than one that never moves it.
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const mounted = useRef(false)
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true
+      return
+    }
+    headingRef.current?.focus()
+  }, [step])
 
   const loading = teams.loading || played.loading || scheduled.loading
 
@@ -60,103 +84,106 @@ export function PublicFixturesPage() {
         lead="Quién ya jugó contra quién dentro de cada zona, y qué falta arreglar."
       />
 
-      <Step number={1} title="Elegí una zona" />
-      <div className="mb-8 grid gap-3 sm:grid-cols-2">
-        {(zones.data ?? []).map((option) => {
-          const active = zoneId === option.id
-          return (
+      {step !== 'zone' && (
+        <BackButton
+          label={step === 'team' ? 'Volver a las zonas' : `Volver a ${zone?.name ?? 'la zona'}`}
+          onClick={() => {
+            // Going back to the zones clears the pair too. Keeping it meant
+            // re-picking the same zone jumped straight past the pair list.
+            if (step === 'team') setZoneId(null)
+            setTeamId(null)
+          }}
+        />
+      )}
+
+      <div className="mb-4 flex items-baseline gap-3">
+        <span className="display text-sm" style={{ color: 'var(--color-accent)' }}>
+          {step === 'zone' ? 1 : step === 'team' ? 2 : 3}
+        </span>
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="display text-[clamp(16px,2.5vw,22px)] outline-none"
+        >
+          {heading}
+        </h2>
+      </div>
+
+      {step === 'zone' && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(zones.data ?? []).map((option) => (
             <button
               key={option.id}
               type="button"
-              onClick={() => {
-                setZoneId(option.id)
-                setTeamId(null)
-              }}
-              aria-pressed={active}
-              className="display card px-4 py-6 text-lg transition-colors"
-              style={{
-                backgroundColor: active ? 'var(--color-accent)' : 'transparent',
-                color: active ? 'var(--color-on-accent)' : 'var(--color-fg)',
-                borderColor: active ? 'var(--color-accent)' : 'var(--color-rule)',
-              }}
+              onClick={() => setZoneId(option.id)}
+              className="display card card-hover px-4 py-6 text-lg"
+              style={{ color: 'var(--color-fg)' }}
             >
               {option.name}
             </button>
-          )
-        })}
-      </div>
-
-      {zoneId !== null && (
-        <>
-          <Step number={2} title="Elegí una pareja para ver sus cruces" />
-          {loading ? (
-            <Notice>Cargando…</Notice>
-          ) : (
-            <ul className="mb-8 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {(teams.data ?? []).map((option) => {
-                const active = teamId === option.id
-                return (
-                  <li key={option.id} className="min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => setTeamId(option.id)}
-                      aria-pressed={active}
-                      className="card card-hover flex w-full items-center gap-3 px-3 py-2.5 text-left"
-                      style={{
-                        borderColor: active ? 'var(--color-accent)' : 'var(--color-rule)',
-                      }}
-                    >
-                      <TeamAvatar team={option} size={30} />
-                      <span className="min-w-0 flex-1 truncate text-sm">
-                        {option.player_one_name} / {option.player_two_name}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </>
+          ))}
+        </div>
       )}
 
-      {team && (
-        <section>
-          <Step number={3} title={`${team.player_one_name} / ${team.player_two_name}`} />
+      {step === 'team' &&
+        (loading ? (
+          <Notice>Cargando…</Notice>
+        ) : (
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {(teams.data ?? []).map((option) => (
+              <li key={option.id} className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setTeamId(option.id)}
+                  className="card card-hover flex w-full items-center gap-3 px-3 py-2.5 text-left"
+                >
+                  <TeamAvatar team={option} size={30} />
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {option.player_one_name} / {option.player_two_name}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ))}
 
-          <div className="grid gap-6">
-            <Group
-              title="Ya jugaron"
-              empty="Todavía no jugaron ningún partido."
-              fixtures={done}
-              team={team}
-            />
-            <Group
-              title="Programados"
-              empty="No tienen ningún partido con fecha."
-              fixtures={booked}
-              team={team}
-            />
-            <Group
-              title="Falta acordar"
-              empty="Ya está todo el fixture arreglado."
-              fixtures={unarranged}
-              team={team}
-            />
-          </div>
-        </section>
+      {step === 'detail' && team && (
+        <div className="grid gap-6">
+          <Group
+            title="Ya jugaron"
+            empty="Todavía no jugaron ningún partido."
+            fixtures={fixtures.filter((f) => f.match?.status === 'played')}
+            team={team}
+          />
+          <Group
+            title="Programados"
+            empty="No tienen ningún partido con fecha."
+            fixtures={fixtures.filter((f) => f.match?.status === 'pending')}
+            team={team}
+          />
+          <Group
+            title="Falta acordar"
+            empty="Ya está todo el fixture arreglado."
+            fixtures={fixtures.filter((f) => f.match === null)}
+            team={team}
+          />
+        </div>
       )}
     </div>
   )
 }
 
-function Step({ number, title }: { number: number; title: string }) {
+function BackButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <div className="mb-4 flex items-baseline gap-3">
-      <span className="display text-sm" style={{ color: 'var(--color-accent)' }}>
-        {number}
-      </span>
-      <h2 className="display text-[clamp(16px,2.5vw,22px)]">{title}</h2>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="mb-4 inline-flex items-center gap-1.5 text-sm transition-opacity hover:opacity-70"
+      style={{ color: 'var(--color-fg-muted)' }}
+    >
+      <span aria-hidden="true">←</span>
+      {label}
+    </button>
   )
 }
 
@@ -233,12 +260,16 @@ function FixtureRow({ rival, match, team }: { rival: Team; match: Match | null; 
           </span>
         </span>
       ) : (
-        <span
-          className="flex-none text-right text-[11px]"
-          style={{ color: 'var(--color-fg-muted)' }}
-        >
-          {schedule ?? 'Sin fecha'}
-        </span>
+        // Sin partido no se dice nada: el titulo del grupo ya explica que ese
+        // cruce esta sin acordar, y repetirlo por fila solo agrega ruido.
+        schedule && (
+          <span
+            className="flex-none text-right text-[11px]"
+            style={{ color: 'var(--color-fg-muted)' }}
+          >
+            {schedule}
+          </span>
+        )
       )}
     </div>
   )
