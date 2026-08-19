@@ -53,8 +53,9 @@ juega y cuándo.
 
 - El inicio muestra los próximos partidos, del más cercano al más lejano.
 - Cada uno muestra zona, fecha y las dos parejas.
+- Muestra también la hora y el lugar cuando están cargados.
 - No muestra marcador ni permite abrirlo: todavía no hay nada que ver.
-- Se aclara que la hora la arreglan las parejas, porque no se guarda.
+- Si el partido no tiene hora cargada, se aclara que la arreglan las parejas.
 
 ### Ver sponsors
 

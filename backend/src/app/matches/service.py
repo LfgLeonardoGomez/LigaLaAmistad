@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status
+from sqlalchemy import nulls_last
 from sqlmodel import Session, select
 
 from app.matches.models import Match, MatchSet, MatchStatus
@@ -54,7 +55,15 @@ def list_matches(
     match_status: MatchStatus | None = None,
     zone_id: int | None = None,
 ) -> list[Match]:
-    statement = select(Match).order_by(Match.date, Match.id)
+    # Same day, earlier time first, and the ones with no time agreed yet at the
+    # end of that day: an undecided time can land anywhere, so it cannot be
+    # interleaved honestly with the times that are already fixed.
+    #
+    # `NULLS LAST` is spelled out and not left to the default because the
+    # default disagrees per engine — Postgres sorts nulls last in ASC, SQLite
+    # sorts them first — and the tests run on SQLite while production runs on
+    # Postgres.
+    statement = select(Match).order_by(Match.date, nulls_last(Match.time), Match.id)
     if match_status is not None:
         statement = statement.where(Match.status == match_status)
     if zone_id is not None:
@@ -260,6 +269,8 @@ def to_read(session: Session, match: Match) -> MatchRead:
         team_a_id=match.team_a_id,
         team_b_id=match.team_b_id,
         date=match.date,
+        time=match.time,
+        venue=match.venue,
         status=match.status,
         sets=[SetRead.model_validate(s, from_attributes=True) for s in sets],
         winner_team_id=winner_team_id(match, sets),

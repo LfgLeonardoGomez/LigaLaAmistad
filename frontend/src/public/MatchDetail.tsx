@@ -1,4 +1,5 @@
 import type { Match, Team, Zone } from '../api/types'
+import { formatTime, venueLabel } from '../api/types'
 import { imageUrl } from '../api/images'
 import { TeamAvatar, formatDate } from './parts'
 
@@ -25,6 +26,8 @@ export function MatchDetail({
   const teamB = teamsById.get(match.team_b_id)
   // A match stores no zone. It is the zone of its teams, which always match.
   const zoneName = zones.find((zone) => zone.id === teamA?.zone_id)?.name
+  const startTime = formatTime(match.time)
+  const venue = venueLabel(match.venue)
 
   return (
     <article className={`card h-full ${interactive ? 'card-hover' : ''}`}>
@@ -33,7 +36,10 @@ export function MatchDetail({
         style={{ borderBottom: '1px solid var(--color-rule)', color: 'var(--color-fg-muted)' }}
       >
         <span>{zoneName ?? '—'}</span>
-        <time dateTime={match.date}>{formatDate(match.date)}</time>
+        <time dateTime={match.time ? `${match.date}T${match.time}` : match.date}>
+          {formatDate(match.date)}
+          {startTime && ` · ${startTime}`}
+        </time>
       </header>
 
       <div className="px-3 py-2">
@@ -49,9 +55,19 @@ export function MatchDetail({
         />
       </div>
 
-      {/* Both are optional and most matches have neither, so each one renders
-          nothing at all rather than an empty slot: a card without them has to
-          look exactly like it did before the feature existed. */}
+      {/* The venue, the photo and the jab are all optional and most matches
+          have none of them, so each one renders nothing at all rather than an
+          empty slot: a card without them has to look exactly like it did
+          before the feature existed. */}
+      {venue && (
+        <p
+          className="px-3 py-1.5 text-[10px] font-semibold tracking-widest uppercase"
+          style={{ borderTop: '1px solid var(--color-rule)', color: 'var(--color-fg-muted)' }}
+        >
+          {venue}
+        </p>
+      )}
+
       {match.photo_url && (
         <img
           src={imageUrl(match.photo_url, { width: 600 })}

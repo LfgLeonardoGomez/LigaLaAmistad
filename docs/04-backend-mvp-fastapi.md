@@ -166,9 +166,24 @@ PATCH  /admin/matches/{match_id}
 DELETE /admin/matches/{match_id}
 ```
 
-`PATCH /admin/matches/{match_id}` sirve para corregir la fecha o las parejas de un partido pendiente.
+`PATCH /admin/matches/{match_id}` sirve para corregir la fecha, la hora, el lugar o las parejas de un partido pendiente. Es también la forma de cargar hora y lugar cuando las parejas los arreglan después del alta. Un campo ausente no se toca; un `null` explícito borra la hora o el lugar ya cargados.
 
 `DELETE /admin/matches/{match_id}` elimina un partido creado por error. Si el partido ya tiene resultado, primero hay que deshacerlo.
+
+### Orden de los partidos
+
+Los listados de partidos, público y administrativo, salen por `date`, después
+por `time` y finalmente por `id`.
+
+La hora es nullable, así que el orden de los nulos se declara explícitamente
+(`NULLS LAST`) en vez de dejarlo al motor: PostgreSQL los pone al final en
+`ASC` y SQLite los pone al principio, y los tests corren sobre SQLite mientras
+producción corre sobre PostgreSQL. Sin declararlo, la suite validaría un orden
+que producción no reproduce.
+
+Los partidos sin hora quedan al final de su día: una hora sin acordar puede
+caer en cualquier momento, así que no se la puede intercalar con las que ya
+están fijas.
 
 ### Resultados
 
@@ -306,6 +321,10 @@ Una instancia de modelo no necesita base de datos para existir: `Team(...)` y `M
 - Pareja A y Pareja B deben ser diferentes.
 - Ambas parejas deben pertenecer a la misma zona.
 - La fecha es obligatoria.
+- La hora es opcional. Si viene, es una hora del día (`HH:MM`); la API la
+  devuelve como `HH:MM:SS`.
+- El lugar es opcional y tiene que ser uno de los valores de `MatchVenue`.
+  Cualquier otro texto es `422`.
 - El partido no recibe `zone_id`: la zona se deriva de las parejas.
 
 ### Editar pareja

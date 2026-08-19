@@ -65,7 +65,11 @@ id
 team_a_id
 team_b_id
 date
+time
+venue
 status
+photo_url
+comment
 created_at
 updated_at
 ```
@@ -77,11 +81,40 @@ pending
 played
 ```
 
+Lugares (`venue`):
+
+```txt
+boss_padel
+cofam
+arena
+indoor
+padelon
+punto_de_oro
+otro
+```
+
+El valor va en minúscula y la etiqueta visible la pone el front:
+
+| Valor | Etiqueta |
+|---|---|
+| `boss_padel` | Boss Pádel |
+| `cofam` | Cofam |
+| `arena` | Arena |
+| `indoor` | Indoor |
+| `padelon` | Padelón |
+| `punto_de_oro` | Punto de Oro |
+| `otro` | Otro |
+
 Notas:
 
 - El partido tiene fecha fija.
-- No tiene hora obligatoria.
-- No tiene cancha/lugar.
+- La hora es **opcional**: un partido se programa antes de que las parejas
+  arreglen a qué hora juegan, y los partidos ya cargados no la tienen.
+- El lugar es **opcional** y es una lista cerrada de clubes, no texto libre.
+  Sin la lista cerrada, "Boss", "boss padel" y "Bos Padel" serían tres clubes
+  distintos en la web.
+- Ninguno de los dos se rellena hacia atrás: un partido sin hora ni lugar es un
+  estado válido, no un dato faltante.
 - No pertenece a una jornada del torneo.
 - El ganador no se guarda: se calcula desde los sets.
 
