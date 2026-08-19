@@ -7,6 +7,8 @@ import { MatchDetail } from './MatchDetail'
 import { Notice, PublicModal, TeamAvatar, formatDate } from './parts'
 import { imageUrl } from '../api/images'
 
+const UPCOMING_SHOWN = 6
+
 const POINT_RULES = [
   { label: 'Ganar 2-0', value: '3 pts' },
   { label: 'Ganar 2-1', value: '2 pts' },
@@ -59,8 +61,10 @@ export function HomePage() {
     () => (upcoming.data ?? []).filter((match) => match.status === 'pending'),
     [upcoming.data],
   )
-  // Already soonest first from the API, so the nearest three are the head.
-  const next = useMemo(() => pending.slice(0, 3), [pending])
+  // Already soonest first from the API, so the nearest ones are the head.
+  // Two rows of three: enough to cover a normal week of the league without
+  // turning the home into the whole fixture list.
+  const next = useMemo(() => pending.slice(0, UPCOMING_SHOWN), [pending])
 
   return (
     <>
