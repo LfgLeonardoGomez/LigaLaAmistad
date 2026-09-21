@@ -4,6 +4,7 @@ import { imageUrl } from '../api/images'
 import { ApiError, api } from '../api/client'
 import type {
   Bracket,
+  BracketMode,
   GroupStagePendingError,
   PlayoffNode,
   PlayoffResultsLoadedError,
@@ -58,31 +59,64 @@ interface ConnectorLine {
   y1: number
   x2: number
   y2: number
+  /** Whether this segment carries a decided winner forward — see `tieIsDecided`. */
+  lit: boolean
 }
 
-function buildConnectors(columns: PlayoffNode[][], centers: number[][]): ConnectorLine[] {
+/**
+ * Whether `node`'s own tie is decided and has a real winner to send forward:
+ * a played match, or a bye that actually carries a team. A bye left with
+ * neither side filled ("Sin cruce") decides nothing, so it never lights.
+ */
+function tieIsDecided(node: PlayoffNode | undefined): boolean {
+  if (!node) return false
+  if (node.status === 'bye') return node.team_a !== null || node.team_b !== null
+  return node.match?.status === 'played'
+}
+
+function buildConnectors(
+  columns: PlayoffNode[][],
+  centers: number[][],
+  official: boolean,
+): ConnectorLine[] {
   const lines: ConnectorLine[] = []
   for (let col = 0; col < columns.length - 1; col++) {
-    const groups = groupFeeders(centers[col] ?? [], columns[col + 1] ?? [])
+    const groupYs = groupFeeders(centers[col] ?? [], columns[col + 1] ?? [])
+    const groupNodes = groupFeeders(columns[col] ?? [], columns[col + 1] ?? [])
     const xRight = col * (CARD_WIDTH + COLUMN_GAP) + CARD_WIDTH
     const xLeft = (col + 1) * (CARD_WIDTH + COLUMN_GAP)
     const xMid = (xRight + xLeft) / 2
 
-    groups.forEach((groupYs, nextIndex) => {
+    groupYs.forEach((ys, nextIndex) => {
+      const nodes = groupNodes[nextIndex] ?? []
+      // Nothing is played in a projection — the owner cannot see this yet
+      // because the whole bracket is still a live guess — so no segment
+      // ever lights outside the official, generated bracket.
+      const litFlags = ys.map((_, i) => official && tieIsDecided(nodes[i]))
       const yNext = centers[col + 1]?.[nextIndex] ?? 0
-      const first = groupYs[0] ?? 0
+      const first = ys[0] ?? 0
 
       // Round 2 feeds the quarterfinal one-to-one: a straight stub, no join.
-      if (groupYs.length === 1) {
-        lines.push({ x1: xRight, y1: first, x2: xLeft, y2: yNext })
+      if (ys.length === 1) {
+        lines.push({ x1: xRight, y1: first, x2: xLeft, y2: yNext, lit: litFlags[0] ?? false })
         return
       }
 
-      for (const y of groupYs) {
-        lines.push({ x1: xRight, y1: y, x2: xMid, y2: y })
-      }
-      lines.push({ x1: xMid, y1: first, x2: xMid, y2: groupYs[groupYs.length - 1] ?? 0 })
-      lines.push({ x1: xMid, y1: yNext, x2: xLeft, y2: yNext })
+      // Exactly two sources feed one destination in every other gap, each
+      // resolved by its OWN match independently of its sibling (they land
+      // on different sides — A and B — of the node ahead). The shared
+      // vertical "elbow" is split at `yNext`, always the midpoint of the
+      // two sources for a pair, so each half carries only its own source's
+      // color instead of one line pretending to speak for both.
+      ys.forEach((y, i) => {
+        const lit = litFlags[i] ?? false
+        lines.push({ x1: xRight, y1: y, x2: xMid, y2: y, lit })
+        lines.push({ x1: xMid, y1: y, x2: xMid, y2: yNext, lit })
+      })
+      // The final stretch into the destination box is shared infrastructure
+      // for both sides, not one team's own path — it lights as soon as
+      // EITHER side has a decided winner flowing into the box.
+      lines.push({ x1: xMid, y1: yNext, x2: xLeft, y2: yNext, lit: litFlags.some(Boolean) })
     })
   }
   return lines
@@ -90,14 +124,16 @@ function buildConnectors(columns: PlayoffNode[][], centers: number[][]): Connect
 
 function BracketColumns({
   columns,
+  mode,
   onOpenNode,
 }: {
   columns: Column[]
+  mode: BracketMode
   onOpenNode: (node: PlayoffNode, round: PlayoffRound) => void
 }) {
   const nodeColumns = columns.map((column) => column.nodes)
   const centers = layoutYCenters(nodeColumns)
-  const lines = buildConnectors(nodeColumns, centers)
+  const lines = buildConnectors(nodeColumns, centers, mode === 'official')
   const width = columns.length * CARD_WIDTH + (columns.length - 1) * COLUMN_GAP
   const height = (nodeColumns[0]?.length ?? 0) * ROW_HEIGHT
 
@@ -124,8 +160,8 @@ function BracketColumns({
               y1={line.y1}
               x2={line.x2}
               y2={line.y2}
-              className="stroke-ink-200"
-              strokeWidth={1}
+              className={line.lit ? 'stroke-ink-900' : 'stroke-ink-200'}
+              strokeWidth={line.lit ? 2 : 1}
             />
           ))}
         </svg>
@@ -585,36 +621,7 @@ export function PlayoffsPage() {
     .flatMap((round) => round.nodes)
     .filter((node) => node.match?.status === 'played').length
 
-  const byRound = new Map(data.rounds.map((round) => [round.round, round.nodes]))
-  const r1 = byRound.get('round_1') ?? []
-  const r2 = byRound.get('round_2') ?? []
-  const qf = byRound.get('quarterfinal') ?? []
-  const sf = byRound.get('semifinal') ?? []
-  const final = byRound.get('final') ?? []
-
-  const desktopColumns: Column[] = data.rounds.map((round) => ({ round: round.round, nodes: round.nodes }))
-
-  // The two halves are genuinely independent until the final, so the split
-  // is derived the same way the desktop connectors are: from the shape of
-  // the arrays, not a hardcoded "first four / last four".
-  const qfHalves = groupFeeders(qf, sf)
-  const r2Halves = groupFeeders(r2, qfHalves)
-  const r1Halves = groupFeeders(r1, qfHalves)
-
-  const half1: Column[] = [
-    { round: 'round_1', nodes: r1Halves[0] ?? [] },
-    { round: 'round_2', nodes: r2Halves[0] ?? [] },
-    { round: 'quarterfinal', nodes: qfHalves[0] ?? [] },
-  ]
-  const half2: Column[] = [
-    { round: 'round_1', nodes: r1Halves[1] ?? [] },
-    { round: 'round_2', nodes: r2Halves[1] ?? [] },
-    { round: 'quarterfinal', nodes: qfHalves[1] ?? [] },
-  ]
-  const finalSection: Column[] = [
-    { round: 'semifinal', nodes: sf },
-    { round: 'final', nodes: final },
-  ]
+  const columns: Column[] = data.rounds.map((round) => ({ round: round.round, nodes: round.nodes }))
 
   const openModal = (node: PlayoffNode, round: PlayoffRound) => setOpenNode({ node, round })
 
@@ -641,22 +648,14 @@ export function PlayoffsPage() {
       )}
 
       {/* Full-bleed: a bracket is wide content, unlike the rest of the panel,
-          which stays inside Layout's max-w-6xl. */}
+          which stays inside Layout's max-w-6xl. One bracket at every width —
+          on a phone it reads fine at full height, it is only the WIDTH that
+          overflows, and this container scrolls horizontally to cover that.
+          A fresh scroll container starts at `scrollLeft: 0` on its own, so
+          Ronda 1 is already what is visible without any extra wiring. */}
       <div style={{ width: '100vw', marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' }} className="px-4 sm:px-6">
-        <div className="hidden overflow-x-auto pb-4 lg:block">
-          <BracketColumns columns={desktopColumns} onOpenNode={openModal} />
-        </div>
-
-        <div className="space-y-10 lg:hidden">
-          <div className="overflow-x-auto pb-4">
-            <BracketColumns columns={half1} onOpenNode={openModal} />
-          </div>
-          <div className="overflow-x-auto pb-4">
-            <BracketColumns columns={half2} onOpenNode={openModal} />
-          </div>
-          <div className="overflow-x-auto pb-4">
-            <BracketColumns columns={finalSection} onOpenNode={openModal} />
-          </div>
+        <div className="overflow-x-auto pb-4">
+          <BracketColumns columns={columns} mode={data.mode} onOpenNode={openModal} />
         </div>
       </div>
 
