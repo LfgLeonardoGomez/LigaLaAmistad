@@ -154,7 +154,7 @@ def test_generating_the_bracket_does_not_leak_playoff_matches_to_the_public_site
     before_pending = admin.get("/public/matches?status=pending").json()
     before_played = admin.get("/public/matches").json()
 
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
 
     assert admin.get("/public/matches?status=pending").json() == before_pending
     assert admin.get("/public/matches").json() == before_played

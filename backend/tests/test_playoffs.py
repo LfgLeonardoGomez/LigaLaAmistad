@@ -8,6 +8,8 @@ team created in that zone, position 2 the second, and so on. That gives fully
 deterministic seeding for free, without needing a round robin.
 """
 
+import itertools
+
 import pytest
 from sqlmodel import Session, select
 
@@ -24,6 +26,18 @@ TOTAL_NODES = 19
 def _make_zone(admin, zone_id: int, count: int, prefix: str) -> list[int]:
     """`count` teams in `zone_id`, in creation order — team at `result[i]` is seed `i + 1`."""
     return [make_team(admin, zone_id, f"{prefix}{n}") for n in range(1, count + 1)]
+
+
+def _play_every_pairing(admin, team_ids: list[int]) -> None:
+    """Creates and plays a match for every unordered pair in `team_ids`.
+
+    For finishing a zone's group stage in a guard test: the pairing itself is
+    what the guard counts (see `app.playoffs.service._group_stage_pairings`),
+    so this mirrors it exactly rather than looping some other way.
+    """
+    for team_a_id, team_b_id in itertools.combinations(team_ids, 2):
+        match_id = make_match(admin, team_a_id, team_b_id)
+        admin.post(f"/admin/matches/{match_id}/result", json=STRAIGHT_WIN_A)
 
 
 def _seed(teams: list[int], position: int) -> int:
@@ -60,11 +74,22 @@ def full_league(admin):
     return zone_a, zone_b
 
 
+@pytest.fixture
+def small_league(admin):
+    """Two pairs in each zone — exactly one cross-pairing per zone, small
+    enough to assert the full pending-pairings list by hand. Used only by the
+    pending-group-stage guard tests below, which care about pairing-level
+    behaviour, not about a realistic bracket shape."""
+    zone_a = _make_zone(admin, ZONE_A, 2, "A")
+    zone_b = _make_zone(admin, ZONE_B, 2, "B")
+    return zone_a, zone_b
+
+
 # --- Generation -----------------------------------------------------------------
 
 
 def test_generating_the_bracket_creates_nineteen_nodes(admin, full_league):
-    response = admin.post("/playoffs/generate")
+    response = admin.post("/playoffs/generate", json={"force": True})
 
     assert response.status_code == 201
     total = sum(len(r["nodes"]) for r in response.json()["rounds"])
@@ -72,7 +97,7 @@ def test_generating_the_bracket_creates_nineteen_nodes(admin, full_league):
 
 
 def test_generating_the_bracket_twice_is_rejected(admin, full_league):
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
 
     response = admin.post("/playoffs/generate")
 
@@ -81,7 +106,7 @@ def test_generating_the_bracket_twice_is_rejected(admin, full_league):
 
 def test_round_1_pairings_match_the_documented_cross(admin, full_league):
     zone_a, zone_b = full_league
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
 
     round_1 = _round(admin.get("/playoffs/bracket").json(), "round_1")
 
@@ -108,7 +133,7 @@ def test_round_1_pairings_match_the_documented_cross(admin, full_league):
 def test_seed_1a_and_1b_land_in_opposite_bracket_halves(admin, full_league):
     """Assert on the persisted node graph, not on a copy of the template."""
     zone_a, zone_b = full_league
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
 
     bracket = admin.get("/playoffs/bracket").json()
     quarterfinal = _round(bracket, "quarterfinal")
@@ -139,7 +164,7 @@ def test_a_short_zone_leaves_an_orphan_bye_that_propagates_without_a_match(admin
     zone_a = _make_zone(admin, ZONE_A, 10, "A")
     zone_b = _make_zone(admin, ZONE_B, 9, "B")  # no position 10
 
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
     bracket = admin.get("/playoffs/bracket").json()
 
     round_1 = _round(bracket, "round_1")
@@ -158,36 +183,115 @@ def test_a_short_zone_leaves_an_orphan_bye_that_propagates_without_a_match(admin
     assert destination["match"] is None
 
 
-def test_generate_is_refused_while_group_stage_matches_are_pending(admin, full_league):
-    zone_a, _ = full_league
+def test_generate_is_refused_while_group_stage_matches_are_pending(admin, small_league):
+    zone_a, zone_b = small_league
     pending_id = make_match(admin, zone_a[0], zone_a[1])
+    # zone_b's only pairing (B1, B2) never gets a `Match` row at all — the
+    # exact case that used to be invisible to this guard: a pairing with no
+    # match row is exactly as unplayed as one stuck in `pending`.
 
     response = admin.post("/playoffs/generate")
 
     assert response.status_code == 409
     body = response.json()["detail"]
-    assert body["pending_count"] == 1
-    assert body["pending_matches"] == [
-        {
-            "id": pending_id,
-            "team_a": {
-                "id": zone_a[0],
-                "player_one_name": "A1",
-                "player_two_name": "A12",
-                "photo_url": None,
-                "seed": "1A",
-            },
-            "team_b": {
-                "id": zone_a[1],
-                "player_one_name": "A2",
-                "player_two_name": "A22",
-                "photo_url": None,
-                "seed": "2A",
-            },
-        }
-    ]
+    assert body["pending_count"] == 2
+    by_id = {m["id"]: m for m in body["pending_matches"]}
+    assert set(by_id) == {pending_id, None}
+    assert by_id[pending_id]["team_a"] == {
+        "id": zone_a[0],
+        "player_one_name": "A1",
+        "player_two_name": "A12",
+        "photo_url": None,
+        "seed": "1A",
+    }
+    assert by_id[pending_id]["team_b"] == {
+        "id": zone_a[1],
+        "player_one_name": "A2",
+        "player_two_name": "A22",
+        "photo_url": None,
+        "seed": "2A",
+    }
+    assert {by_id[None]["team_a"]["id"], by_id[None]["team_b"]["id"]} == {zone_b[0], zone_b[1]}
     # Refused before anything is written: still a projection, not a bracket.
     assert admin.get("/playoffs/bracket").json()["mode"] == "projection"
+
+
+def test_a_played_pairing_is_not_counted_pending(admin, small_league):
+    zone_a, zone_b = small_league
+    match_id = make_match(admin, zone_a[0], zone_a[1])
+    admin.post(f"/admin/matches/{match_id}/result", json=STRAIGHT_WIN_A)
+
+    response = admin.post("/playoffs/generate")
+
+    assert response.status_code == 409
+    body = response.json()["detail"]
+    # Only zone B's pairing remains — zone A's is PLAYED now.
+    assert body["pending_count"] == 1
+    assert body["pending_matches"][0]["id"] is None
+    assert {body["pending_matches"][0]["team_a"]["id"], body["pending_matches"][0]["team_b"]["id"]} == {
+        zone_b[0],
+        zone_b[1],
+    }
+
+
+def test_a_withdrawn_teams_pairing_is_never_counted_pending(admin, small_league):
+    zone_a, zone_b = small_league
+    admin.patch(f"/admin/teams/{zone_a[1]}", json={"status": "withdrawn"})
+
+    response = admin.post("/playoffs/generate")
+
+    assert response.status_code == 409
+    body = response.json()["detail"]
+    # Zone A's only pairing involves the withdrawn team and is excluded
+    # entirely — it can never be played, so it must never demand `force`.
+    assert body["pending_count"] == 1
+    remaining = body["pending_matches"][0]
+    assert {remaining["team_a"]["id"], remaining["team_b"]["id"]} == {zone_b[0], zone_b[1]}
+
+
+def test_pending_count_agrees_between_projection_and_generate_guard(admin, small_league):
+    zone_a, _ = small_league
+    make_match(admin, zone_a[0], zone_a[1])
+
+    projection = admin.get("/playoffs/bracket").json()
+    guard_body = admin.post("/playoffs/generate").json()["detail"]
+
+    assert projection["mode"] == "projection"
+    assert projection["pending_group_matches"] == guard_body["pending_count"] == 2
+
+
+def test_generate_succeeds_without_force_once_every_pairing_is_played(admin, small_league):
+    """The guard's other half: once the group stage has genuinely finished,
+    no `force` should be needed at all. This is the test a permanently-closed
+    guard — say, a pairing computation that always reports something
+    outstanding — would fail while every 409-only test above stayed green."""
+    zone_a, zone_b = small_league
+    _play_every_pairing(admin, zone_a)
+    _play_every_pairing(admin, zone_b)
+
+    assert admin.get("/playoffs/bracket").json()["pending_group_matches"] == 0
+
+    response = admin.post("/playoffs/generate")
+
+    assert response.status_code == 201
+    assert admin.get("/playoffs/bracket").json()["mode"] == "official"
+
+
+def test_generate_succeeds_without_force_when_only_a_withdrawn_pairing_remains(admin, small_league):
+    """Pins the product decision as behaviour, not just as a comment on
+    `_group_stage_pairings`: a withdrawn team's own pairing must never keep
+    the guard closed, even with no `force` at all."""
+    zone_a, zone_b = small_league
+    _play_every_pairing(admin, zone_b)
+    # Zone A's only pairing (A1 vs A2) is left unplayed, with no match row —
+    # instead one of the two is withdrawn, so that pairing can never be
+    # played and must never count.
+    admin.patch(f"/admin/teams/{zone_a[1]}", json={"status": "withdrawn"})
+
+    response = admin.post("/playoffs/generate")
+
+    assert response.status_code == 201
+    assert admin.get("/playoffs/bracket").json()["mode"] == "official"
 
 
 def test_generate_with_force_ignores_pending_group_stage_matches(admin, full_league):
@@ -205,7 +309,7 @@ def test_generate_with_force_ignores_pending_group_stage_matches(admin, full_lea
 
 
 def test_advancing_fills_the_right_round_2_slot(admin, full_league):
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
     round_1 = _round(admin.get("/playoffs/bracket").json(), "round_1")
     slot8 = _node(round_1, 8)  # (A,10) vs (B,3) -> round_2 slot 2, side a
 
@@ -220,7 +324,7 @@ def test_advancing_fills_the_right_round_2_slot(admin, full_league):
 
 
 def test_the_round_2_match_is_created_only_once_both_sides_are_known(admin, full_league):
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
     round_1 = _round(admin.get("/playoffs/bracket").json(), "round_1")
     slot8 = _node(round_1, 8)  # -> round_2 slot 2, side a
     slot4 = _node(round_1, 4)  # -> round_2 slot 2, side b
@@ -240,7 +344,7 @@ def test_the_round_2_match_is_created_only_once_both_sides_are_known(admin, full
 
 
 def test_correcting_a_round_1_result_updates_the_still_unplayed_round_2_pairing(admin, full_league):
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
     round_1 = _round(admin.get("/playoffs/bracket").json(), "round_1")
     slot8 = _node(round_1, 8)  # (A,10) vs (B,3) -> round_2 slot 2, side a
     match_id = slot8["match"]["id"]
@@ -259,7 +363,7 @@ def test_correcting_a_round_1_result_updates_the_still_unplayed_round_2_pairing(
 
 def test_correcting_a_result_that_already_advanced_unplays_the_downstream_match(admin, full_league):
     """The explicit correction case the design flags: undo, then redo, downstream."""
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
     round_1 = _round(admin.get("/playoffs/bracket").json(), "round_1")
     slot8 = _node(round_1, 8)  # -> round_2 slot 2, side a
     slot4 = _node(round_1, 4)  # -> round_2 slot 2, side b
@@ -287,16 +391,16 @@ def test_correcting_a_result_that_already_advanced_unplays_the_downstream_match(
 
 
 def test_deleting_the_bracket_allows_regenerating_it(admin, full_league):
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
 
     response = admin.delete("/playoffs")
 
     assert response.status_code == 204
-    assert admin.post("/playoffs/generate").status_code == 201
+    assert admin.post("/playoffs/generate", json={"force": True}).status_code == 201
 
 
 def test_delete_is_refused_once_a_bracket_result_is_loaded(admin, full_league):
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
     slot1 = _node(_round(admin.get("/playoffs/bracket").json(), "round_1"), 1)
     admin.post(f"/admin/matches/{slot1['match']['id']}/result", json=STRAIGHT_WIN_A)
 
@@ -309,7 +413,7 @@ def test_delete_is_refused_once_a_bracket_result_is_loaded(admin, full_league):
 
 
 def test_delete_with_force_wipes_a_bracket_that_has_results(admin, full_league):
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
     slot1 = _node(_round(admin.get("/playoffs/bracket").json(), "round_1"), 1)
     admin.post(f"/admin/matches/{slot1['match']['id']}/result", json=STRAIGHT_WIN_A)
 
@@ -394,7 +498,7 @@ def test_projection_shows_a_bye_for_a_short_zone(admin):
 def test_the_bracket_endpoint_switches_to_official_after_generation_and_stays_there(admin, full_league):
     assert admin.get("/playoffs/bracket").json()["mode"] == "projection"
 
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
 
     response = admin.get("/playoffs/bracket").json()
     assert response["mode"] == "official"
@@ -427,7 +531,7 @@ ROUND_2_DRAW_ORDER = (4, 1, 2, 3)
 
 
 def test_official_bracket_returns_round_1_and_round_2_in_draw_order(admin, full_league):
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
 
     bracket = admin.get("/playoffs/bracket").json()
 
@@ -458,7 +562,7 @@ def test_draw_order_invariant_each_round_wires_straight_into_the_next(admin, ful
     each one's wire forward lands on the next round's nodes in ITS draw
     order too (collapsing repeats — a node fed by two of this round's nodes
     is visited twice in a row, once per feeder)."""
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
 
     with Session(engine) as session:
         all_nodes = list(session.exec(select(PlayoffMatch)).all())
@@ -515,7 +619,7 @@ def test_bracket_nodes_carry_each_teams_photo_url(admin, full_league):
 
 
 def test_official_bracket_gives_every_resolved_team_its_seed_through_every_round(admin, full_league):
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
 
     round_1 = _round(admin.get("/playoffs/bracket").json(), "round_1")
     slot1 = _node(round_1, 1)  # (A,3) vs (B,10) -> round_2 slot 1, side a
@@ -546,7 +650,7 @@ def test_bye_survivor_carries_its_own_seed(admin):
     zone_a = _make_zone(admin, ZONE_A, 10, "A")
     _make_zone(admin, ZONE_B, 9, "B")  # no position 10
 
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
     bracket = admin.get("/playoffs/bracket").json()
     orphan = _node(_round(bracket, "round_1"), 1)  # (A,3) vs (B,10) — B10 does not exist
 

@@ -85,7 +85,7 @@ def test_a_playoff_match_cannot_be_voted_by_guessing_its_id(admin, client):
     for n in range(1, 11):
         make_team(admin, ZONE_B, f"B{n}")
 
-    admin.post("/playoffs/generate")
+    admin.post("/playoffs/generate", json={"force": True})
     round_1 = next(
         r for r in admin.get("/playoffs/bracket").json()["rounds"] if r["round"] == "round_1"
     )

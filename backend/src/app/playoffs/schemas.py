@@ -103,9 +103,11 @@ class BracketRead(SQLModel):
 class GenerateBracketIn(SQLModel):
     """`force` skips the pending-group-stage guard.
 
-    Needed because a withdrawn pair leaves its remaining matches `pending`
-    forever in this league — without an escape hatch, one withdrawal would
-    make the bracket impossible to ever generate.
+    A withdrawn pair's remaining pairings never count toward the guard (see
+    `app.playoffs.service._group_stage_pairings`) — that pairing can never be
+    played, so it never needs an escape hatch. `force` exists for the
+    genuine case: an ACTIVE pairing that will not be played and the admin
+    wants to generate anyway.
     """
 
     model_config = {"extra": "forbid"}
@@ -114,9 +116,16 @@ class GenerateBracketIn(SQLModel):
 
 
 class PendingGroupMatchRead(SQLModel):
-    """One group-stage match the generate guard is refusing to ignore."""
+    """One zone pairing the generate guard is refusing to ignore.
 
-    id: int
+    `id` is the linked `Match`'s id when one exists, or `None` when the
+    pairing has no `Match` row at all yet — a pair can go the whole group
+    stage without one ever being created (see `frontend/src/public/FixturesPage.tsx`'s
+    "Falta acordar" group), and that absence is exactly as unplayed as a
+    `Match` stuck in `pending`. See `app.playoffs.service._pending_group_stage_pairings`.
+    """
+
+    id: int | None
     team_a: PlayoffTeamRead
     team_b: PlayoffTeamRead
 

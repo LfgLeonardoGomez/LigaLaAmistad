@@ -16,6 +16,7 @@ winner (`_reset_downstream`) and then simply calling `_settle` again.
 """
 
 import datetime
+import itertools
 from collections import defaultdict
 from typing import NamedTuple
 
@@ -46,7 +47,7 @@ from app.playoffs.schemas import (
     PlayoffTeamRead,
 )
 from app.standings.service import get_standings
-from app.teams.models import Team
+from app.teams.models import Team, TeamStatus
 from app.votes.models import MatchVote
 from app.zones.models import Zone
 
@@ -346,21 +347,91 @@ def is_playoff_match(session: Session, match_id: int) -> bool:
     )
 
 
-def _pending_group_stage_matches(session: Session) -> list[Match]:
-    """Group-stage matches still pending: not linked to any playoff node.
+class PendingPairing(NamedTuple):
+    """One zone pairing not yet PLAYED.
 
-    At the point `build_bracket` can run, no playoff node exists yet, so in
-    practice this is simply every pending match — but it is written against
-    the actual linkage (rather than just "every pending match") so it stays
-    correct if this is ever called again once a bracket already exists.
+    `match_id` is the linked `Match`'s id when one exists, `None` when the
+    pairing has no `Match` row at all — which is exactly as unplayed as one
+    stuck in `pending`. See `_pending_group_stage_pairings`.
+    """
+
+    match_id: int | None
+    team_a_id: int
+    team_b_id: int
+
+
+def _group_stage_pairings(session: Session) -> list[tuple[int, int]]:
+    """Every zone pairing that can still be played: unordered pairs of ACTIVE
+    teams sharing a zone.
+
+    Computed from the teams themselves, never from `Match` rows — the same
+    inversion `frontend/src/public/FixturesPage.tsx` already makes on the
+    public site ("everyone else in the zone is a fixture, whether or not a
+    match exists for it yet"). A withdrawn team is left out entirely: its
+    remaining pairings can never be played, so counting them would demand
+    `force` forever after a single withdrawal — and a guard that always
+    objects is one the admin stops reading.
+    """
+    zone_a_id, zone_b_id = _ordered_zone_ids(session)
+    pairings: list[tuple[int, int]] = []
+    for zone_id in (zone_a_id, zone_b_id):
+        team_ids = sorted(
+            session.exec(
+                select(Team.id).where(Team.zone_id == zone_id, Team.status == TeamStatus.ACTIVE)
+            ).all()
+        )
+        pairings.extend(itertools.combinations(team_ids, 2))
+    return pairings
+
+
+def _pending_group_stage_pairings(session: Session) -> list[PendingPairing]:
+    """Zone pairings not yet PLAYED — the real "is the group stage done" question.
+
+    This used to be answered by counting `Match` rows stuck in `pending`,
+    which undercounts: in this league a pair can go the whole group stage
+    without a `Match` row ever being created for it (pairs agree a date
+    before a match is created), and that pairing contributed zero. Answered
+    here from the pairing itself (`_group_stage_pairings`) instead, checked
+    against whatever `Match` — if any — exists for it.
+
+    Keeps the "not linked to a playoff node" filter the old, `Match`-row-only
+    version carried, for whenever this runs again once a bracket already
+    exists.
     """
     linked = get_playoff_match_ids(session)
-    pending = session.exec(select(Match).where(Match.status == MatchStatus.PENDING)).all()
-    return [match for match in pending if match.id not in linked]
+    match_by_pair: dict[tuple[int, int], Match] = {}
+    for match in session.exec(select(Match)).all():
+        if match.id in linked:
+            continue
+        key = (
+            (match.team_a_id, match.team_b_id)
+            if match.team_a_id < match.team_b_id
+            else (match.team_b_id, match.team_a_id)
+        )
+        # A pairing is only ever meant to have one match in this league's
+        # round robin, but nothing enforces that at the database level. If it
+        # were ever violated, a PLAYED match always wins the slot — that is
+        # the only fact this guard needs from it.
+        if key not in match_by_pair or match.status == MatchStatus.PLAYED:
+            match_by_pair[key] = match
+
+    pending: list[PendingPairing] = []
+    for team_a_id, team_b_id in _group_stage_pairings(session):
+        match = match_by_pair.get((team_a_id, team_b_id))
+        if match is not None and match.status == MatchStatus.PLAYED:
+            continue
+        pending.append(
+            PendingPairing(
+                match_id=match.id if match is not None else None,
+                team_a_id=team_a_id,
+                team_b_id=team_b_id,
+            )
+        )
+    return pending
 
 
-def _group_stage_pending_error(session: Session, pending: list[Match]) -> dict:
-    team_ids = {team_id for match in pending for team_id in (match.team_a_id, match.team_b_id)}
+def _group_stage_pending_error(session: Session, pending: list[PendingPairing]) -> dict:
+    team_ids = {team_id for pairing in pending for team_id in (pairing.team_a_id, pairing.team_b_id)}
     teams_by_id = {
         team.id: team for team in session.exec(select(Team).where(Team.id.in_(team_ids))).all()
     }
@@ -375,11 +446,11 @@ def _group_stage_pending_error(session: Session, pending: list[Match]) -> dict:
         pending_count=len(pending),
         pending_matches=[
             PendingGroupMatchRead(
-                id=match.id,
-                team_a=_team_summary(teams_by_id.get(match.team_a_id), seed_labels),
-                team_b=_team_summary(teams_by_id.get(match.team_b_id), seed_labels),
+                id=pairing.match_id,
+                team_a=_team_summary(teams_by_id.get(pairing.team_a_id), seed_labels),
+                team_b=_team_summary(teams_by_id.get(pairing.team_b_id), seed_labels),
             )
-            for match in pending
+            for pairing in pending
         ],
     )
     return payload.model_dump()
@@ -392,11 +463,13 @@ def build_bracket(session: Session, force: bool = False) -> BracketRead:
     call would either duplicate them or silently redraw a bracket that may
     already have matches in progress.
 
-    Also refuses, unless `force` is set, to run while group-stage matches are
-    still pending: generating early freezes a half-complete standings
-    snapshot and seeds the whole bracket wrong. `force` exists because a
-    withdrawn pair leaves its remaining matches pending forever in this
-    league, which would otherwise make the bracket impossible to generate.
+    Also refuses, unless `force` is set, to run while any zone pairing
+    between two ACTIVE teams has not been PLAYED yet: generating early
+    freezes a half-complete standings snapshot and seeds the whole bracket
+    wrong. A withdrawn pair's own pairings never count here (see
+    `_group_stage_pairings`), so a withdrawal alone never forces this open;
+    `force` exists for the genuine case, an active pairing that will not be
+    played.
     """
     if session.exec(select(PlayoffMatch)).first() is not None:
         raise HTTPException(
@@ -405,7 +478,7 @@ def build_bracket(session: Session, force: bool = False) -> BracketRead:
         )
 
     if not force:
-        pending = _pending_group_stage_matches(session)
+        pending = _pending_group_stage_pairings(session)
         if pending:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -717,5 +790,5 @@ def _project_bracket(session: Session) -> BracketRead:
             )
             for playoff_round in _ROUND_ORDER
         ],
-        pending_group_matches=len(_pending_group_stage_matches(session)),
+        pending_group_matches=len(_pending_group_stage_pairings(session)),
     )
