@@ -9,6 +9,11 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    // The parsed response body, structured errors and all. Most callers only
+    // need the flattened `message`; a 409 whose body carries more than a
+    // string (the playoffs generate/delete guards, for instance) reads it
+    // straight from here instead of re-parsing text.
+    readonly body: unknown = null,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -60,7 +65,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (response.status === 401) {
       window.dispatchEvent(new CustomEvent('liga:session-expired'))
     }
-    throw new ApiError(response.status, readDetail(body, `Error ${response.status}`))
+    throw new ApiError(response.status, readDetail(body, `Error ${response.status}`), body)
   }
 
   return body as T

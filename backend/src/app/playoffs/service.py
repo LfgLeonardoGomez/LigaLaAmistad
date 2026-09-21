@@ -98,6 +98,37 @@ def _build_node_sources() -> dict[tuple[PlayoffRound, int], tuple[_Source | None
 NODE_SOURCES = _build_node_sources()
 
 
+def _build_draw_order() -> dict[PlayoffRound, tuple[int, ...]]:
+    """Each round's nodes, in the order the bracket draws without a crossing.
+
+    Derived from `NODE_SOURCES` — never hand-listed — because the wiring
+    already fully determines it: starting at the final (a single node) and
+    walking backward, a round's draw order is simply each already-ordered
+    node in the round after it, expanded into whichever of ITS two sources
+    are nodes of this round, side A before side B. A round fed entirely by
+    seeds (round 1's own sources) contributes nothing to the walk and keeps
+    its natural slot order.
+
+    Hand-listing this instead would put the same fact in two places, and a
+    future change to `BRACKET_TEMPLATE`'s wiring would silently stop
+    matching it — this function is what keeps that impossible.
+    """
+    order: dict[PlayoffRound, tuple[int, ...]] = {PlayoffRound.FINAL: (1,)}
+    for round_index in range(len(_ROUND_ORDER) - 1, 0, -1):
+        this_round = _ROUND_ORDER[round_index]
+        previous_round = _ROUND_ORDER[round_index - 1]
+        previous_slots: list[int] = []
+        for slot in order[this_round]:
+            for source in NODE_SOURCES[(this_round, slot)]:
+                if isinstance(source, _NodeSource) and source.round is previous_round:
+                    previous_slots.append(source.slot)
+        order[previous_round] = tuple(previous_slots)
+    return order
+
+
+DRAW_ORDER = _build_draw_order()
+
+
 def _placeholder_date() -> datetime.date:
     """A newly wired playoff match needs *a* date; `Match.date` has no default.
 
@@ -155,6 +186,22 @@ def _seed_lookup_from_snapshot(session: Session, zone_a_id: int, zone_b_id: int)
         for seed in session.exec(select(PlayoffSeed).where(PlayoffSeed.zone_id == zone_id)).all():
             lookup[(zone_letter, seed.position)] = seed.team_id
     return lookup
+
+
+SeedLabels = dict[int, str]
+
+
+def _seed_labels(seed_lookup: SeedLookup) -> SeedLabels:
+    """Invert `(zone_letter, position) -> team_id` into `team_id -> "3A"`.
+
+    The label a team's seed chip shows, for every team the lookup covers —
+    which is every team in both zones, since both `_seed_lookup_from_snapshot`
+    and `_seed_lookup_from_standings` walk a zone's full standings, not just
+    the handful of positions `BRACKET_TEMPLATE` names directly. That is what
+    lets `_team_summary` give a correct seed to a round-2, semifinal or final
+    team too, not only the ones a template entry seeds directly.
+    """
+    return {team_id: f"{position}{zone_letter}" for (zone_letter, position), team_id in seed_lookup.items()}
 
 
 def _snapshot_seeds(session: Session, zone_a_id: int, zone_b_id: int) -> None:
@@ -317,14 +364,20 @@ def _group_stage_pending_error(session: Session, pending: list[Match]) -> dict:
     teams_by_id = {
         team.id: team for team in session.exec(select(Team).where(Team.id.in_(team_ids))).all()
     }
+    # No bracket exists yet at this point — there is no frozen snapshot to
+    # read from — so this reads the same live standings the projection does.
+    # It is meaningful here too: it is each team's current zone position,
+    # which is exactly what generating now (with `force`) would seed them by.
+    zone_a_id, zone_b_id = _ordered_zone_ids(session)
+    seed_labels = _seed_labels(_seed_lookup_from_standings(session, zone_a_id, zone_b_id))
     payload = GroupStagePendingError(
         detail="The group stage still has pending matches. Pass force=true to generate anyway.",
         pending_count=len(pending),
         pending_matches=[
             PendingGroupMatchRead(
                 id=match.id,
-                team_a=_team_summary(teams_by_id.get(match.team_a_id)),
-                team_b=_team_summary(teams_by_id.get(match.team_b_id)),
+                team_a=_team_summary(teams_by_id.get(match.team_a_id), seed_labels),
+                team_b=_team_summary(teams_by_id.get(match.team_b_id), seed_labels),
             )
             for match in pending
         ],
@@ -433,13 +486,19 @@ def advance(session: Session, playoff_match: PlayoffMatch) -> None:
 # --- Presentation ---------------------------------------------------------------
 
 
-def _team_summary(team: Team | None) -> PlayoffTeamRead | None:
+def _team_summary(team: Team | None, seed_labels: SeedLabels) -> PlayoffTeamRead | None:
     if team is None:
         return None
     return PlayoffTeamRead(
         id=team.id,
         player_one_name=team.player_one_name,
         player_two_name=team.player_two_name,
+        photo_url=team.photo_url,
+        # Falls back to "" only for a team `seed_labels` genuinely has no
+        # position for, which should not happen — every team in the league
+        # has a zone standing — but a bracket slot is not the place to raise
+        # over a data problem the standings module already owns.
+        seed=seed_labels.get(team.id, ""),
     )
 
 
@@ -494,6 +553,8 @@ def _official_bracket(session: Session) -> BracketRead:
         if team_ids
         else {}
     )
+    zone_a_id, zone_b_id = _ordered_zone_ids(session)
+    seed_labels = _seed_labels(_seed_lookup_from_snapshot(session, zone_a_id, zone_b_id))
 
     match_ids = [node.match_id for node in nodes if node.match_id is not None]
     matches_by_id = (
@@ -509,27 +570,32 @@ def _official_bracket(session: Session) -> BracketRead:
         ).all():
             sets_by_match[match_set.match_id].append(match_set)
 
-    nodes_by_round: dict[PlayoffRound, list[PlayoffNodeRead]] = defaultdict(list)
+    nodes_by_round: dict[PlayoffRound, dict[int, PlayoffNodeRead]] = defaultdict(dict)
     for node in nodes:
-        nodes_by_round[node.round].append(
-            PlayoffNodeRead(
-                id=node.id,
-                slot=node.slot,
-                status=node.status,
-                team_a=_team_summary(teams_by_id.get(node.team_a_id)),
-                team_b=_team_summary(teams_by_id.get(node.team_b_id)),
-                match=(
-                    _match_read(matches_by_id[node.match_id], sets_by_match[node.match_id])
-                    if node.match_id is not None
-                    else None
-                ),
-            )
+        nodes_by_round[node.round][node.slot] = PlayoffNodeRead(
+            id=node.id,
+            slot=node.slot,
+            status=node.status,
+            team_a=_team_summary(teams_by_id.get(node.team_a_id), seed_labels),
+            team_b=_team_summary(teams_by_id.get(node.team_b_id), seed_labels),
+            match=(
+                _match_read(matches_by_id[node.match_id], sets_by_match[node.match_id])
+                if node.match_id is not None
+                else None
+            ),
         )
 
     return BracketRead(
         mode=BracketMode.OFFICIAL,
         rounds=[
-            PlayoffRoundRead(round=playoff_round, nodes=nodes_by_round[playoff_round])
+            PlayoffRoundRead(
+                round=playoff_round,
+                nodes=[
+                    nodes_by_round[playoff_round][slot]
+                    for slot in DRAW_ORDER[playoff_round]
+                    if slot in nodes_by_round[playoff_round]
+                ],
+            )
             for playoff_round in _ROUND_ORDER
             if playoff_round in nodes_by_round
         ],
@@ -608,6 +674,7 @@ def _project_bracket(session: Session) -> BracketRead:
     """
     zone_a_id, zone_b_id = _ordered_zone_ids(session)
     seed_lookup = _seed_lookup_from_standings(session, zone_a_id, zone_b_id)
+    seed_labels = _seed_labels(seed_lookup)
 
     team_ids = set(seed_lookup.values())
     teams_by_id = (
@@ -616,7 +683,7 @@ def _project_bracket(session: Session) -> BracketRead:
         else {}
     )
 
-    nodes_by_round: dict[PlayoffRound, list[PlayoffNodeRead]] = defaultdict(list)
+    nodes_by_round: dict[PlayoffRound, dict[int, PlayoffNodeRead]] = defaultdict(dict)
     for template in BRACKET_TEMPLATE:
         team_a_id = seed_lookup.get(template.seed_a) if template.seed_a is not None else None
         team_b_id = seed_lookup.get(template.seed_b) if template.seed_b is not None else None
@@ -632,21 +699,22 @@ def _project_bracket(session: Session) -> BracketRead:
         else:
             node_status = PlayoffMatchStatus.PENDING
 
-        nodes_by_round[template.round].append(
-            PlayoffNodeRead(
-                id=None,
-                slot=template.slot,
-                status=node_status,
-                team_a=_team_summary(teams_by_id.get(team_a_id)),
-                team_b=_team_summary(teams_by_id.get(team_b_id)),
-                match=None,
-            )
+        nodes_by_round[template.round][template.slot] = PlayoffNodeRead(
+            id=None,
+            slot=template.slot,
+            status=node_status,
+            team_a=_team_summary(teams_by_id.get(team_a_id), seed_labels),
+            team_b=_team_summary(teams_by_id.get(team_b_id), seed_labels),
+            match=None,
         )
 
     return BracketRead(
         mode=BracketMode.PROJECTION,
         rounds=[
-            PlayoffRoundRead(round=playoff_round, nodes=nodes_by_round[playoff_round])
+            PlayoffRoundRead(
+                round=playoff_round,
+                nodes=[nodes_by_round[playoff_round][slot] for slot in DRAW_ORDER[playoff_round]],
+            )
             for playoff_round in _ROUND_ORDER
         ],
         pending_group_matches=len(_pending_group_stage_matches(session)),

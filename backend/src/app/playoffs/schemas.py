@@ -21,11 +21,26 @@ class BracketMode(str, enum.Enum):
 
 
 class PlayoffTeamRead(SQLModel):
-    """Just enough to label a bracket slot — the front end already has the rest."""
+    """Enough to label a bracket slot and show its pair without a second request.
+
+    `photo_url` rides along because the bracket modal shows each pair's photo
+    on click; without it the front end would need to re-fetch the team just
+    to render what this endpoint already has in hand.
+
+    `seed` (`"3A"`, `"10B"`) is a property of the TEAM within this playoff,
+    not of the node it currently occupies — every team has a zone position
+    whether it got here by seed or by winning its way here, so this is filled
+    in for every team in every round, not just round 1 and a quarterfinal's
+    direct qualifier. That is deliberate: it is what the front end reads for
+    the seed chip, instead of keeping its own copy of which side of which
+    node is a seed. See `_team_summary` for where it comes from in each mode.
+    """
 
     id: int
     player_one_name: str
     player_two_name: str
+    photo_url: str | None = None
+    seed: str
 
 
 class PlayoffNodeRead(SQLModel):
@@ -49,6 +64,18 @@ class PlayoffNodeRead(SQLModel):
 
 
 class PlayoffRoundRead(SQLModel):
+    """One round's nodes, in DRAW order — not slot order.
+
+    Draw order is the order the bracket is drawn on paper: walk the tree back
+    from the final, each node before the one it feeds. Rendered slot by
+    slot, that order is what keeps every connector line from one round to the
+    next straight; slot order draws crossings almost everywhere except the
+    last three rounds, where slot order and draw order happen to coincide.
+    See `app.playoffs.service.DRAW_ORDER` for how it is computed from
+    `BRACKET_TEMPLATE`. `slot` itself is untouched — it is still the node's
+    stable identity, just not the array position.
+    """
+
     round: PlayoffRound
     nodes: list[PlayoffNodeRead]
 

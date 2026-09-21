@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { to: '/admin/parejas', label: 'Parejas' },
   { to: '/admin/partidos', label: 'Partidos' },
   { to: '/admin/tabla', label: 'Tabla' },
+  { to: '/admin/playoffs', label: 'Playoffs' },
   { to: '/admin/sponsors', label: 'Sponsors' },
   { to: '/admin/encuesta', label: 'Encuesta' },
   { to: '/admin/administradores', label: 'Administradores' },
