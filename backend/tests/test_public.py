@@ -141,3 +141,27 @@ def test_upcoming_matches_can_be_filtered_by_zone(admin):
 
     assert len(admin.get(f"/public/matches?status=pending&zone_id={ZONE_A}").json()) == 1
     assert len(admin.get(f"/public/matches?status=pending&zone_id={ZONE_B}").json()) == 1
+
+
+def test_generating_the_bracket_does_not_leak_playoff_matches_to_the_public_site(admin):
+    """A generated playoff `Match` row is real and admin-visible, but nothing
+    about it may reach the public matches endpoint yet — the public bracket
+    page does not exist."""
+    for n in range(1, 11):
+        make_team(admin, ZONE_A, f"A{n}")
+    for n in range(1, 11):
+        make_team(admin, ZONE_B, f"B{n}")
+    before_pending = admin.get("/public/matches?status=pending").json()
+    before_played = admin.get("/public/matches").json()
+
+    admin.post("/playoffs/generate")
+
+    assert admin.get("/public/matches?status=pending").json() == before_pending
+    assert admin.get("/public/matches").json() == before_played
+
+    round_1 = next(
+        r for r in admin.get("/playoffs/bracket").json()["rounds"] if r["round"] == "round_1"
+    )
+    playoff_match_ids = {node["match"]["id"] for node in round_1["nodes"]}
+    public_ids = {m["id"] for m in admin.get("/public/matches?status=pending").json()}
+    assert playoff_match_ids and not (playoff_match_ids & public_ids)

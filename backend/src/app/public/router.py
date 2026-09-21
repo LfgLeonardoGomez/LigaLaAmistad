@@ -16,6 +16,7 @@ from app.database.session import SessionDep
 from app.matches import service as match_service
 from app.matches.models import MatchStatus
 from app.matches.schemas import MatchRead
+from app.playoffs import service as playoff_service
 from app.predictions import service as prediction_service
 from app.predictions.schemas import PollResults, PollState, PredictionIn
 from app.sponsors import service as sponsor_service
@@ -67,8 +68,18 @@ def list_matches(
     visitor, and it keeps every existing caller working. Asking for `pending`
     is how the home lists what is still to be played: knowing who plays next
     is as much public information as knowing who won.
+
+    Playoff matches are filtered out here rather than in
+    `match_service.list_matches`: the admin match listing legitimately needs
+    them (an admin loads a playoff result through the same generic
+    `/admin/matches/{id}/result` endpoint a group-stage match uses), so the
+    exclusion belongs to the public-facing view, not to the shared query.
+    Nothing about playoffs is public yet — that is the bracket page, which
+    does not exist.
     """
     matches = match_service.list_matches(session, status, zone_id)
+    playoff_match_ids = playoff_service.get_playoff_match_ids(session)
+    matches = [match for match in matches if match.id not in playoff_match_ids]
     return [match_service.to_read(session, match) for match in matches]
 
 

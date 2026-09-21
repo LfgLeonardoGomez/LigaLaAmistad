@@ -7,7 +7,7 @@ register. Someone determined can clear it and vote again, and that is accepted.
 
 import pytest
 
-from .conftest import STRAIGHT_WIN_A, ZONE_A, make_match, make_team
+from .conftest import STRAIGHT_WIN_A, ZONE_A, ZONE_B, make_match, make_team
 
 DEVICE = "device-key-aaaaaaaaaaaa"
 OTHER_DEVICE = "device-key-bbbbbbbbbbbb"
@@ -76,6 +76,26 @@ def test_a_played_match_cannot_be_voted(admin, client, match, teams):
     admin.post(f"/admin/matches/{match}/result", json=STRAIGHT_WIN_A)
 
     assert vote(client, match, teams[0]).status_code == 409
+
+
+def test_a_playoff_match_cannot_be_voted_by_guessing_its_id(admin, client):
+    """Nothing about playoffs is public yet — not even by knowing a match id."""
+    for n in range(1, 11):
+        make_team(admin, ZONE_A, f"A{n}")
+    for n in range(1, 11):
+        make_team(admin, ZONE_B, f"B{n}")
+
+    admin.post("/playoffs/generate")
+    round_1 = next(
+        r for r in admin.get("/playoffs/bracket").json()["rounds"] if r["round"] == "round_1"
+    )
+    node = round_1["nodes"][0]
+    playoff_match_id = node["match"]["id"]
+    real_team_id = node["match"]["team_a_id"]
+
+    response = vote(client, playoff_match_id, real_team_id)
+
+    assert response.status_code == 409
 
 
 def test_votes_cast_before_the_result_survive_it(admin, client, match, teams):

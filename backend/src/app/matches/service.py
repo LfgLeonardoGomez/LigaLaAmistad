@@ -168,6 +168,30 @@ def require_played(session: Session, match_id: int, action: str) -> Match:
     return match
 
 
+def _advance_playoff_bracket(session: Session, match_id: int) -> None:
+    """If this match is a bracket node, push its winner (or its correction) onward.
+
+    A local import: `app.playoffs.service` imports back from this module
+    (`get_sets`, `winner_team_id`, `delete_result`) to reuse the set/winner
+    logic instead of duplicating it, so importing it at module load time here
+    would be circular. Importing it only when a result is actually loaded or
+    corrected keeps the connection without the cycle.
+
+    Every match a fan can vote on, photograph or comment goes through
+    `set_result`/`replace_result` regardless of whether it happens to be a
+    playoff node, so this is the one place both of those funnel through
+    rather than something the playoffs router has to remember to call.
+    """
+    from app.playoffs.models import PlayoffMatch
+    from app.playoffs.service import advance
+
+    playoff_match = session.exec(
+        select(PlayoffMatch).where(PlayoffMatch.match_id == match_id)
+    ).first()
+    if playoff_match is not None:
+        advance(session, playoff_match)
+
+
 def set_result(session: Session, match_id: int, data: MatchResultIn) -> Match:
     """Load the result of a pending match. The match becomes `played`."""
     match = get_match(session, match_id)
@@ -181,6 +205,7 @@ def set_result(session: Session, match_id: int, data: MatchResultIn) -> Match:
     session.add(match)
     session.commit()
     session.refresh(match)
+    _advance_playoff_bracket(session, match_id)
     return match
 
 
@@ -191,6 +216,9 @@ def replace_result(session: Session, match_id: int, data: MatchResultIn) -> Matc
     not to the marker, so fixing a wrong score does not throw them away — a
     `comment` absent from the body keeps the stored one, and sending one
     replaces it.
+
+    If this match is a playoff node, a changed winner is re-propagated
+    through the bracket: see `_advance_playoff_bracket`.
     """
     match = get_match(session, match_id)
     if match.status is not MatchStatus.PLAYED:
@@ -205,6 +233,7 @@ def replace_result(session: Session, match_id: int, data: MatchResultIn) -> Matc
     session.add(match)
     session.commit()
     session.refresh(match)
+    _advance_playoff_bracket(session, match_id)
     return match
 
 
