@@ -301,6 +301,154 @@ body {
   background-position: var(--band-position);
 }
 
+/* --- Sponsor band -----------------------------------------------------------
+
+   "Nos acompañan" as light frosted-glass cards. Deliberately light in every
+   theme, not just papel: `.card` is border-only, no fill, which is exactly
+   what made a sponsor logo with dark shapes on a transparent background
+   disappear against `--color-canvas` on velada and lima. A themed dark tint
+   here would only relocate that bug, so the glass ignores the theme and
+   stays near-white everywhere.
+
+   No `backdrop-filter` here on purpose. It forces its own compositing layer
+   and is expensive to animate, and most of this league's traffic is a
+   mid-range Android phone watching a rotating marquee — exactly where that
+   cost concentrates. Measured under CPU throttling (see the apply report),
+   it did not come back with a clean verdict either way, and a CPU throttle
+   only slows the main thread, not the GPU compositor that actually does the
+   blur — so it cannot rule the risk out. Dropping it is the safer default;
+   the translucent fill alone, sitting on the same veiled photo, still reads
+   as glass.
+--------------------------------------------------------------------------- */
+.sponsor-band__viewport {
+  overflow: hidden;
+}
+
+.sponsor-band__viewport--scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* No max-width cap here: flex items never grow past their own content size
+   (no flex-grow set), so one or two cards already stay clustered in the
+   centre instead of spreading edge to edge — a cap is not what prevents
+   that. It only used to force three or four cards to wrap one line early on
+   a desktop that had plenty of room left; removing it lets the row wrap for
+   the reason that should decide it, running out of actual space, which only
+   happens on a narrow phone. */
+.sponsor-band__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+
+.sponsor-band__viewport--scroll .sponsor-band__row {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+}
+
+/* Two copies of the row back to back, animated as a single strip that shifts
+   left by exactly one copy's width. The seam where it resets never shows,
+   because the second copy is already sitting where the first one started. */
+.sponsor-band__marquee {
+  display: flex;
+  gap: 14px;
+  width: max-content;
+  animation-name: sponsor-band-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.sponsor-band__marquee .sponsor-band__row {
+  flex-wrap: nowrap;
+}
+
+@keyframes sponsor-band-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Pausing on hover or focus is what makes a sponsor's link reliably
+   clickable while the strip is moving, instead of chasing a target that
+   drifts away mid-click. */
+@media (hover: hover) {
+  .sponsor-band__marquee:hover {
+    animation-play-state: paused;
+  }
+}
+
+.sponsor-band__marquee:focus-within {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sponsor-band__marquee {
+    animation: none;
+  }
+}
+
+.sponsor-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background-color: rgb(255 255 255 / 0.85);
+  border: 1px solid rgb(255 255 255 / 0.4);
+  box-shadow: 0 8px 24px -14px rgb(0 0 0 / 0.4);
+}
+
+/* Papel starts from a light canvas over a photo the shared veil barely
+   darkens (that veil tints toward papel's own light canvas colour, which
+   does nothing against a bright, busy crop), so the same near-white card
+   that reads fine on velada and lima loses its edge here. A firmer border
+   alone was not enough against that — this adds a dusky scrim behind the
+   whole strip, scoped to the sponsor band so the rest of the page's papel
+   photo sections are untouched, plus a darker border and a tighter, denser
+   shadow so the card still separates from the busiest part of the photo. */
+[data-theme='papel'] .sponsor-band__viewport {
+  padding: 16px;
+  background-color: rgb(28 26 22 / 0.22);
+  border-radius: 12px;
+}
+
+[data-theme='papel'] .sponsor-card {
+  border-color: rgb(28 26 22 / 0.35);
+  box-shadow: 0 6px 18px -8px rgb(0 0 0 / 0.5);
+}
+
+.sponsor-card--link {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+@media (hover: hover) {
+  .sponsor-card--link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px -14px rgb(0 0 0 / 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sponsor-card--link:hover {
+    transform: none;
+  }
+}
+
+.sponsor-card__logo {
+  height: clamp(56px, 8vw, 72px);
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+}
+
 /* --- "Season under way" badge ---------------------------------------------
 
    A slow green breath. Green because it means live, not because of the

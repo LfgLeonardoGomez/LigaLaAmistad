@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
+import type { Sponsor } from '../api/types'
+import { useResource } from '../api/useResource'
+import { SponsorFooterBand } from './SponsorBand'
 import { ThemeToggle } from '../theme/ThemeToggle'
 
 /**
@@ -52,6 +55,14 @@ const NAV_ITEMS = [
 
 export function PublicLayout() {
   const [navRef, navEdges] = useScrollEdges<HTMLElement>()
+  const location = useLocation()
+
+  // The home page already carries the sponsor strip inside its own photo
+  // band. A route check here is what keeps it from landing twice on that one
+  // page — and it doubles as the fetch gate, so the other pages don't pay
+  // for a request the home page already made for itself.
+  const isHome = location.pathname === '/'
+  const sponsors = useResource<Sponsor[]>(isHome ? null : '/public/sponsors')
 
   return (
     <div className="public-shell flex min-h-full flex-col">
@@ -132,6 +143,8 @@ export function PublicLayout() {
       <main className="w-full flex-1">
         <Outlet />
       </main>
+
+      {!isHome && <SponsorFooterBand sponsors={sponsors.data ?? []} />}
 
       <footer className="mt-16" style={{ borderTop: '1px solid var(--color-rule)' }}>
         <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-8">

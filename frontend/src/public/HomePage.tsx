@@ -11,7 +11,7 @@ import { useMatchVotes } from '../api/votes'
 import { MatchDetail } from './MatchDetail'
 import { UpcomingVote } from './UpcomingVote'
 import { Notice, PublicModal, TeamAvatar, formatDate } from './parts'
-import { imageUrl } from '../api/images'
+import { SponsorBand } from './SponsorBand'
 
 const UPCOMING_SHOWN = 6
 
@@ -140,7 +140,7 @@ export function HomePage() {
         )}
       </section>
 
-      <PhotoBand />
+      <PhotoBand sponsors={sponsors.data ?? []} />
 
       {/* No fixtures means no section. A visitor gains nothing from being told
           that a list is empty, and the home already says where the league
@@ -217,24 +217,6 @@ export function HomePage() {
             tally={votes.tallies.get(openMatch.id)}
           />
         </PublicModal>
-      )}
-
-      {sponsors.data && sponsors.data.length > 0 && (
-        <section className="container-page py-[clamp(28px,5vw,52px)]">
-          <h2
-            className="mb-5 text-xs font-semibold tracking-widest uppercase"
-            style={{ color: 'var(--color-fg-muted)' }}
-          >
-            Nos acompañan
-          </h2>
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {sponsors.data.map((sponsor) => (
-              <li key={sponsor.id}>
-                <SponsorTile sponsor={sponsor} />
-              </li>
-            ))}
-          </ul>
-        </section>
       )}
     </>
   )
@@ -313,8 +295,16 @@ function Hero({
   )
 }
 
-/** The photo stays still while this section scrolls over it, like a window. */
-function PhotoBand() {
+/**
+ * The photo stays still while this section scrolls over it, like a window.
+ *
+ * The sponsor strip lives at the bottom of this same band rather than in a
+ * band of its own: one photo, one window, two zones split by a hairline.
+ * A second parallax section here would just be three things competing for
+ * one block, and this one already has a job — headline and CTA to the
+ * standings.
+ */
+function PhotoBand({ sponsors }: { sponsors: Sponsor[] }) {
   return (
     <section className="photo-band">
       <div className="photo-band__media" />
@@ -343,6 +333,17 @@ function PhotoBand() {
           </Link>
         </div>
       </div>
+
+      {/* No sponsors, no strip: an empty plate with a hairline above it would
+          explain nothing to a visitor. */}
+      {sponsors.length > 0 && (
+        <div
+          className="container-page py-[clamp(28px,5vw,52px)]"
+          style={{ borderTop: '1px solid var(--color-rule)' }}
+        >
+          <SponsorBand sponsors={sponsors} />
+        </div>
+      )}
     </section>
   )
 }
@@ -559,31 +560,5 @@ function RuleCard({
       <h3 className="display mt-2 mb-3 text-lg">{title}</h3>
       {children}
     </article>
-  )
-}
-
-function SponsorTile({ sponsor }: { sponsor: Sponsor }) {
-  const image = (
-    <img
-      src={imageUrl(sponsor.logo_url, { width: 240 })}
-      alt={sponsor.name}
-      loading="lazy"
-      className="h-14 w-full object-contain p-2"
-    />
-  )
-
-  if (!sponsor.url) {
-    return <div className="card">{image}</div>
-  }
-
-  return (
-    <a
-      href={sponsor.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="card card-hover block"
-    >
-      {image}
-    </a>
   )
 }
