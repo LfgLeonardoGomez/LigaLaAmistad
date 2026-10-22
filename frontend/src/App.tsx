@@ -10,6 +10,7 @@ import { PredictionsPage } from './pages/PredictionsPage'
 import { SponsorsPage } from './pages/SponsorsPage'
 import { StandingsPage } from './pages/StandingsPage'
 import { TeamsPage } from './pages/TeamsPage'
+import { AmericanosListRoute, AmericanoSetupRoute, AmericanoUnavailableRoute } from './pages/americanos/AmericanoRoutes'
 import { HomePage } from './public/HomePage'
 import { PublicLayout } from './public/PublicLayout'
 import { PublicFixturesPage } from './public/FixturesPage'
@@ -72,6 +73,10 @@ export function App() {
             <Route path="sponsors" element={<SponsorsPage />} />
             <Route path="encuesta" element={<PredictionsPage />} />
             <Route path="administradores" element={<AdminUsersPage />} />
+            <Route path="americanos" element={<AmericanosListRoute />} />
+            <Route path="americanos/:eventId" element={<AmericanoSetupRoute resolve />} />
+            <Route path="americanos/:eventId/configuracion" element={<AmericanoSetupRoute />} />
+            <Route path="americanos/*" element={<AmericanoUnavailableRoute />} />
           </Route>
         </Route>
 

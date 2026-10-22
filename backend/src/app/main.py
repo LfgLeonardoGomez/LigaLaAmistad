@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.americanos.router import router as americanos_router
 from app.auth.router import admin_users_router
 from app.auth.router import router as auth_router
 from app.core.config import settings
@@ -34,6 +35,7 @@ app.include_router(matches_router)
 app.include_router(sponsors_router)
 app.include_router(predictions_router)
 app.include_router(playoffs_router)
+app.include_router(americanos_router)
 
 
 @app.get("/health", tags=["health"])
