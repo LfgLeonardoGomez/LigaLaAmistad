@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type {
   GroupGames, RoundDraftRow, RoundDraftState, RoundResponse, SaveRoundRequest, ScoreInput, Side,
 } from '../../api/americano-types'
@@ -11,24 +11,29 @@ function rowsFrom(round: RoundResponse): RoundDraftRow[] {
   }))
 }
 
-function initialState(round: RoundResponse) {
-  return { baseline: round, rows: rowsFrom(round), errors: {} as RoundDraftState['errors'] }
+function initialState(round: RoundResponse, editable: boolean) {
+  return { baseline: round, editable, rows: rowsFrom(round), errors: {} as RoundDraftState['errors'] }
 }
 
-export function useRoundDraft(round: RoundResponse): RoundDraftState {
-  const [state, setState] = useState(() => initialState(round))
+export function useRoundDraft(round: RoundResponse, editable = true): RoundDraftState {
+  const [state, setState] = useState(() => initialState(round, editable))
+  const canEdit = useRef(editable)
+  useLayoutEffect(() => {
+    canEdit.current = editable
+    return () => { canEdit.current = false }
+  }, [editable])
   // Same-round refreshes cannot replace an in-progress edit. Saves call accept explicitly.
-  if (state.baseline.event_id !== round.event_id || state.baseline.number !== round.number) {
-    setState(initialState(round))
+  if (state.baseline.event_id !== round.event_id || state.baseline.number !== round.number || state.editable !== editable) {
+    setState(initialState(round, editable))
   }
   const baselineRows = rowsFrom(state.baseline)
-  const dirty = state.rows.length !== baselineRows.length || state.rows.some(row => {
+  const dirty = editable && (state.rows.length !== baselineRows.length || state.rows.some(row => {
     const saved = baselineRows.find(value => value.match_id === row.match_id)
     return !saved || row.match_id !== saved.match_id || row.games_a !== saved.games_a || row.games_b !== saved.games_b
-  })
+  }))
 
   const setScore = useCallback((matchId: number, side: Side, value: ScoreInput) => {
-    if (!/^[0-9]?$/.test(value)) return
+    if (!canEdit.current || !/^[0-9]?$/.test(value)) return
     setState(current => {
       if (current.baseline.read_only || current.baseline.locked || !['groups', 'review'].includes(current.baseline.state)) return current
       const errors = { ...current.errors, [matchId]: { ...current.errors[matchId], [side]: undefined } }
@@ -40,7 +45,7 @@ export function useRoundDraft(round: RoundResponse): RoundDraftState {
   }, [])
 
   const validate = useCallback((): SaveRoundRequest | null => {
-    if (state.baseline.read_only || state.baseline.locked || !['groups', 'review'].includes(state.baseline.state)) return null
+    if (!canEdit.current || state.baseline.read_only || state.baseline.locked || !['groups', 'review'].includes(state.baseline.state)) return null
     const errors: RoundDraftState['errors'] = {}
     for (const row of state.rows) {
       for (const side of ['a', 'b'] as const) {
@@ -61,12 +66,20 @@ export function useRoundDraft(round: RoundResponse): RoundDraftState {
     }
   }, [state])
 
-  const reset = useCallback(() => setState(current => initialState(current.baseline)), [])
-  const accept = useCallback((canonical: RoundResponse) => setState(initialState(canonical)), [])
-  const rebase = useCallback((canonical: RoundResponse) => setState(current => ({
-    baseline: canonical,
-    rows: rowsFrom(canonical).map(saved => current.rows.find(row => row.match_id === saved.match_id) ?? saved),
-    errors: {},
-  })), [])
+  const reset = useCallback(() => {
+    if (canEdit.current) setState(current => initialState(current.baseline, true))
+  }, [])
+  const accept = useCallback((canonical: RoundResponse) => {
+    if (canEdit.current) setState(initialState(canonical, true))
+  }, [])
+  const rebase = useCallback((canonical: RoundResponse) => {
+    if (!canEdit.current) return
+    setState(current => ({
+      baseline: canonical,
+      editable: true,
+      rows: rowsFrom(canonical).map(saved => current.rows.find(row => row.match_id === saved.match_id) ?? saved),
+      errors: {},
+    }))
+  }, [])
   return { rows: state.rows, dirty, errors: state.errors, setScore, validate, reset, accept, rebase }
 }

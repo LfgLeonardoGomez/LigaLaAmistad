@@ -255,7 +255,7 @@ export interface AmericanoErrorBody {
   fields?: AmericanoFieldError[]
 }
 
-// Full future port; the live draft client implements only AmericanoDraftOperations.
+// Full future port; live clients publish only their implemented capabilities.
 export interface AmericanoOperations {
   listEvents(): Promise<ListEventsResponse>
   createEvent(request: CreateEventRequest): Promise<EventDetail>
@@ -286,6 +286,9 @@ export type AmericanoDraftOperations = Pick<AmericanoOperations,
   'addRegistration' | 'updateRegistration' | 'deleteRegistration'>
 export type AmericanoSetupCapabilities = Pick<AmericanoOperations,
   'setZones' | 'randomizeZones' | 'generateFixture'>
+export type AmericanoRoundReadOperations = Pick<AmericanoOperations,
+  'loadEvent' | 'loadRound' | 'loadStandings'>
+export type AmericanoRoundOperations = AmericanoRoundReadOperations & Pick<AmericanoOperations, 'saveRound'>
 export interface AmericanoListPageProps {
   operations: Pick<AmericanoDraftOperations, 'listEvents' | 'createEvent'>
   onNavigate: (target: AmericanoNavigation) => void
@@ -306,9 +309,11 @@ export interface DirtyNavigationDraft {
   // false means navigation/logout MUST remain blocked.
   discard: () => boolean
 }
-export interface AmericanoRoundPageProps extends AmericanoEventPageProps {
+export interface AmericanoRoundPageProps extends Omit<AmericanoEventPageProps, 'operations'> {
+  operations: AmericanoRoundOperations
   roundNumber: number
   onDirtyChange: (draft: DirtyNavigationDraft | null) => void
+  mode?: 'editable' | 'consultation'
 }
 export interface RoundDraftRow { match_id: AmericanoId; games_a: ScoreInput; games_b: ScoreInput }
 export interface ScoreRowProps {

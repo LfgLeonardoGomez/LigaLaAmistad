@@ -32,6 +32,18 @@ function SetupLoader({ eventId, operations, onNavigate }: AmericanoSetupPageProp
   const generation = useRef(0)
   const initialized = useRef(false)
   const needsReview = useRef(false)
+  const generationUncertain = useRef(false)
+
+  function adoptGenerated(next: EventDetail) {
+    setEvent(next)
+    setEditorVersion((version) => version + 1)
+    setCanonical(null)
+    generationUncertain.current = false
+    needsReview.current = false
+    setBlocked(false)
+    setError(null)
+    setNotice('Fixture generado. Configuración bloqueada.')
+  }
 
   useEffect(() => {
     let ignore = false
@@ -43,7 +55,9 @@ function SetupLoader({ eventId, operations, onNavigate }: AmericanoSetupPageProp
     setNotice('')
     void operations.loadEvent(eventId).then((next) => {
       if (ignore) return
-      if (initialized.current) {
+      if (generationUncertain.current && next.state !== 'draft') {
+        adoptGenerated(next)
+      } else if (initialized.current) {
         setCanonical(next)
       } else {
         initialized.current = true
@@ -70,8 +84,8 @@ function SetupLoader({ eventId, operations, onNavigate }: AmericanoSetupPageProp
       setEvent(next)
       setEditorVersion((version) => version + 1)
       setAdditionUncertain(false)
+      generationUncertain.current = false
       setNotice(kind === 'generated' ? 'Fixture generado. Configuración bloqueada.' : 'Cambios guardados.')
-      if (kind === 'generated') onNavigate({ ...next.continuation, event_id: next.id })
       return true
     } catch (cause) {
       if (generation.current === started) {
@@ -83,9 +97,26 @@ function SetupLoader({ eventId, operations, onNavigate }: AmericanoSetupPageProp
         const detail = cause instanceof Error ? cause.message : 'No se pudo guardar.'
         const recovery = mustReload ? ' Conservamos la edición. Recargá el evento para verificar el estado guardado antes de reintentar.' : ''
         setError(`${status === 409 ? 'Conflicto 409. ' : ''}${detail}${recovery}`)
+        if (kind === 'generated' && (status === 0 || typeof status !== 'number' || status >= 500)) {
+          generationUncertain.current = true
+          setCanonical(null)
+          try {
+            const next = await operations.loadEvent(eventId)
+            if (generation.current !== started) return false
+            if (next.state !== 'draft') adoptGenerated(next)
+            else setCanonical(next)
+          } catch (reloadCause) {
+            if (generation.current === started) setError(reloadCause instanceof Error ? reloadCause.message : 'No se pudo verificar el evento. Recargá para comprobar si el fixture fue generado.')
+          }
+        }
       }
       return false
-    } finally { inFlight.current = false; setPending(false) }
+    } finally {
+      if (generation.current === started) {
+        inFlight.current = false
+        setPending(false)
+      }
+    }
   }
 
   function reloadEvent() {
@@ -101,6 +132,7 @@ function SetupLoader({ eventId, operations, onNavigate }: AmericanoSetupPageProp
     setEvent(canonical)
     setCanonical(null)
     needsReview.current = false
+    generationUncertain.current = false
     setBlocked(false)
     setError(null)
     setNotice(keepProposal ? 'Edición conservada con la revisión guardada. Guardá explícitamente para enviarla.' : 'Datos guardados adoptados; edición local descartada.')
@@ -128,7 +160,7 @@ function SetupLoader({ eventId, operations, onNavigate }: AmericanoSetupPageProp
   </div>
 }
 
-function SetupEditor({ event, operations, mutate, disabled, recovery }: AmericanoSetupPageProps & { event: EventDetail; mutate: Mutate; disabled: boolean; recovery: Recovery }) {
+function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery }: AmericanoSetupPageProps & { event: EventDetail; mutate: Mutate; disabled: boolean; recovery: Recovery }) {
   const [name, setName] = useState(event.name)
   const [zoneCount, setZoneCount] = useState(event.zone_count)
   const [stage, setStage] = useState(event.start_stage)
@@ -205,6 +237,12 @@ function SetupEditor({ event, operations, mutate, disabled, recovery }: American
     const request = { ...revision, player1_name: player1.trim(), player2_name: player2.trim() }
     await mutate(() => editing ? operations.updateRegistration(event.id, editing.id, request) : operations.addRegistration(event.id, request), editing ? undefined : 'registration-add')
   }
+  function generateFixture() {
+    const generate = operations.generateFixture
+    if (!generate || locked || dirty || !event.can_generate) return
+    if (!window.confirm('Generar el fixture es irreversible: se bloquean nombres, parejas, zonas y etapa. No se puede regenerar. ¿Querés continuar?')) return
+    void mutate(async () => (await generate(event.id, revision)).event, 'generated')
+  }
 
   return <>
     {recovery.additionUncertain && <Alert tone="info">La incorporación pudo haberse guardado. Revisá las parejas guardadas antes de volver a agregar: conservar la edición no reenvía nada. Los nombres repetidos son válidos; un nuevo envío explícito puede crear otra pareja.</Alert>}
@@ -226,6 +264,16 @@ function SetupEditor({ event, operations, mutate, disabled, recovery }: American
     {frozen && <Alert tone="info">
       El fixture ya fue generado. Parejas, nombres, zonas y etapa quedan bloqueados según el alcance aprobado; no hay regeneración. Este historial muestra la configuración guardada.
     </Alert>}
+    {frozen && <section aria-label="Resumen del fixture" className="space-y-3 rounded-md border border-ink-200 bg-ink-50 p-5">
+      <h2 className="font-semibold text-ink-900">Resumen del fixture</h2>
+      <p className="text-sm text-ink-700">Estado: {states[event.state]} · Rondas totales: <span className="tabular-nums">{event.total_rounds}</span></p>
+      <p className="text-sm text-ink-600">{event.total_rounds > 0 ? 'Las rondas están disponibles solo para consulta.' : 'Este fixture no tiene rondas.'} La carga de resultados, clasificación y playoffs todavía no están disponibles.</p>
+      <div className="flex flex-wrap gap-2">
+        {event.total_rounds > 0 ? <Button variant="secondary" disabled={disabled}
+          onClick={() => onNavigate({ kind: 'round', event_id: event.id, round_number: 1 })}>Consultar rondas</Button> : null}
+        <Button variant="secondary" disabled={disabled} onClick={() => onNavigate({ kind: 'event', event_id: event.id })}>Continuar evento</Button>
+      </div>
+    </section>}
     <Card className="p-5">
       <h2 className="mb-4 font-semibold text-ink-900">01 · Configuración</h2>
       {!frozen ? <form onSubmit={saveConfiguration}>
@@ -323,8 +371,8 @@ function SetupEditor({ event, operations, mutate, disabled, recovery }: American
       {dirty && <p className="text-sm text-amber-700">Guardá o descartá la edición activa antes de continuar. La vista previa usa la configuración guardada.</p>}
       {!frozen && <p className="text-sm text-ink-700">Alcance aprobado: generar bloquea nombres, parejas, zonas y etapa. No permite regenerar.</p>}
       {!operations.generateFixture && <p id="fixture-next-cut" className="text-sm text-ink-600">Generación no implementada en este corte; disponible en un próximo corte aunque los cupos sean suficientes.</p>}
-      {!frozen && <Button aria-describedby={!operations.generateFixture ? 'fixture-next-cut' : undefined} disabled={!operations.generateFixture || locked || dirty || !event.can_generate} onClick={() => { const generate = operations.generateFixture; if (generate && !locked && !dirty && event.can_generate) void mutate(async () => (await generate(event.id, revision)).event, 'generated') }}>Generar fixture</Button>}
-      <p className="text-sm text-ink-600">Rondas, clasificación y playoffs no implementados en este corte; disponibles en próximos cortes.</p>
+      {!frozen && <Button aria-describedby={!operations.generateFixture ? 'fixture-next-cut' : undefined} disabled={!operations.generateFixture || locked || dirty || !event.can_generate} onClick={generateFixture}>Generar fixture</Button>}
+      <p className="text-sm text-ink-600">La carga de resultados, clasificación y playoffs estarán disponibles en próximos cortes. Las rondas generadas se pueden consultar desde el resumen.</p>
       <p className="text-xs text-ink-500 tabular-nums">Evento #{event.id} · Revisión {event.revision} · Grupos {event.groups_revision}</p>
     </Card>
   </>

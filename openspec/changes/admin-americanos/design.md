@@ -1,16 +1,16 @@
 ## Context
 
-Módulo privado y aditivo de Americanos dentro del admin existente. Las specs definen aceptación. **D3/D6/D8 aprobados el2026-10-21**, seis plantillas/etiquetas/fixtures alineados. Contrato **[2.1.0](contracts.md)**, transporte sin cambios. **5/31 aceptadas (0.1,3.1,3.2,8.1 y8.2),26 pendientes**;8.2 exclusivamente pura tras P2 resuelto/revisión PASS.1.x/2.x sin aceptación dedicada;5.1/5.2 PARTIAL;9.x y G2/G3/G4 incompletos. [Cierre actual8.2](verification.md#cierre-actual--reglas-puras82); historia4/31/P2 abierto preservada.
+Módulo privado y aditivo de Americanos dentro del admin existente. Las specs definen aceptación. **D3/D6/D8 aprobados el2026-10-21**, seis plantillas/etiquetas/fixtures alineados. Contrato **[2.1.0](contracts.md)** sin cambios. **14/31 aceptadas,17 pendientes** según [checklist](tasks.md): nuevas4.2/4.3 backend con PostgreSQL FULL PASS y5.2/6.4 por auditorías dedicadas;1.x/8.x siguen puras.5.1 PARTIAL;2.x/5.3/6.1–6.3/9.x/G2/G3/G4 pendientes. [Estado actual e historia](verification.md).
 
-### Aprobación humana y slice vigente — 2026-10-21
+### Aprobación humana y slice vigente — actualizado2026-10-22
 
 Fuente: **«confirma todas ls decisiones que tenes ahi.»**, en respuesta a la consulta detallada sobre las recomendaciones D3/D6/D8 y el slice técnico. Se aprueban esas recomendaciones, no las alternativas. La nota es posterior a G0 y a las correcciones documentadas; preserva su historia.
 
-El usuario autorizó **continuar y trabajo paralelo** para backend/frontend3.2 y puros8.1/8.2. I integra los cuatro documentos principales y solo disponibilidad/procedencia en proposal/specs AE/AK.3.2/8.1 aceptadas previamente; este cierre agrega8.2 pura tras corrección P2/re-review PASS. Fuentes recíprocas y participantes derivados del ganador validados;999 no ganador/fuente winner ausente/final truncada rechazados,999 seed legítima aceptada. Sin manejo de estado DB ni persistencia atómica de campeón hasta8.3; no existe API playoffs actual.
+Tras «continuamos» posterior al commit previo `2bc5abf`,1.1/1.2/1.3 se aceptaron puras por auditoría dedicada del código existente, sin RED retrospectivo, y3.3 backend/frontend se implementó/revisó. I integra solo documentación; no agrega aceptación por suites verdes.8.2 pura conserva P2 resuelto: fuentes recíprocas/participantes derivados del ganador;999 no ganador/fuente winner ausente/final truncada rechazados y999 seed legítima aceptada. Estado DB/campeón atómico siguen en8.3; API playoffs ausente.
 
-El slice vigente comprende **nueve operaciones privadas**: siete de3.1 más PUT `/{e}/zones` (`expected_revision,zone_count,zone_a_registration_ids`) y POST `/{e}/zones/randomize` (`expected_revision`), ambos200 `EventDetail` directo. Auth existente intacta, draft/revisión/identidad por evento y cero mutaciones de liga. `americanoDraftOperations` mantiene siete; `americanoSetupOperations` inyecta nueve en setup sin simular18. Manual desigual, random equilibrado persistido/visible, una zona todas y cupos orientativos verificados live20/20; dominio/API481 PASS en la revisión entregada.5.1/5.2 PARTIAL sin fixture/continuación.8.1 puro:39→45 PASS sobre constructor existente, sin cambios productivos ni RED retrospectivo; no habilita playoffs. Recuperación explícita/merge por campo en contrato §3.3.
+El backend publica **13 operaciones privadas**, incluido PUT de ronda. Cliente draft siete/setup diez/round cuatro, con `loadEvent` compartido. Quedan cinco operaciones futuras: GET qualification, PUT resoluciones, POST confirmación y GET/PUT playoffs. Fixture conserva `RevisionRequest` → `{event,first_round}`; zonas/random, `EventDetail` directo.5.2/6.4 aceptadas;5.1 PARTIAL. Recuperación explícita/merge por campo y generación incierta en contrato §3.3.
 
-**Generación3.3 sigue deshabilitada**, incluso con `can_generate=true`; rondas, clasificación y playoffs sin integración operativa aceptada. No resorteo DURANTE generar y congelación desde generación pendientes3.3. Sin cambios auth/login ni5.3/guard global/data router/logout. `main→router→service→models` registra ocho tablas en metadata, sin DDL de arranque ni cambios en imports session/env. Pruebas solo en SQLite nuevo descartable: no acreditan locks PostgreSQL. Migración/activación productiva requieren aprobación separada. Esta pasada edita docs y valida OpenSpec/whitespace, sin tests, servidores, builds ni commits.
+**Disponibilidad actual:** generación confirmada, recuperación GET y consulta real de ronda/tablas montada bajo el guard admin existente; UI editable deshabilitada hasta aprobar5.3. Nombres/configuración congelados, sin resorteo/regeneración;1+1 review sin ronda0.4.2/4.3 incluyen guardado atómico, revisiones/invalidation y contención PostgreSQL independiente tras P2 de binding int32 corregido, DTO JSON-safe intacto. Frontend: rutas adicionales en App, wrappers/setup, RoundPage/hook/ScoreRow y puertos API; main/Layout/auth conservados. Mismas ocho tablas por import, sin DDL de arranque; migración/activación productiva separadas.
 
 ### Base verificada
 
@@ -93,7 +93,7 @@ completed --corregir final permitida--> completed [actualiza campeón]
 
 La asignación aleatoria se guarda en borrador y se muestra antes de generar. Se puede ajustar manualmente antes del fixture; generar no vuelve a sortear. No hay random en desempates deportivos. **Alternativa:** aleatorizar durante generación ahorra una acción, pero vuelve opaco el reparto; se descarta.
 
-**Estado3.2 aceptado:** reparto manual/random persistido y visible antes de generar. Cupos insuficientes no impiden guardar el borrador (ej.1+8), solo vuelven `can_generate=false`; una zona exige exactamente todas las inscripciones. Random mantiene diferencia <=1, manual no exige equilibrio. Generación y su congelación/no resorteo siguen siendo criterio futuro3.3, sin evidencia de ejecución aquí.
+**Estado3.2/3.3 aceptado:** reparto manual/random persistido/visible y cupos insuficientes guardables en draft (ej.1+8, `can_generate=false`); una zona exige todas, random diferencia <=1 y manual desigual. Generar consume membresía/orden guardados sin shuffle y congela todos los mutadores existentes;0 partidos entra review sin rondas. Contención PostgreSQL3.3 aceptada previamente;4.1 preserva estas reglas.
 
 ### D4. Algoritmos puros con contratos explícitos
 
@@ -198,7 +198,7 @@ Frontend propuesto:
 
 En `/admin/americanos/:eventId`, resolver continuación desde estado servidor: draft → configuración; groups → primera no guardada; review → clasificados; playoffs/completed → cuadro. URL explícita de ronda ya desbloqueada se respeta; fallback a continuación segura. No guardar cada foco como estado servidor ni persistir nombres/marcadores en localStorage. Recargar con edición pendiente muestra advertencia nativa; si se abandona, se recupera solo lo guardado.
 
-**Excepción de disponibilidad draft+zonas, no de reglas:** mapa completo futuro. `AmericanosListRoute` atiende listado; `AmericanoSetupRoute resolve` redirige `/:eventId` con `replace` a configuración y `AmericanoSetupRoute` inyecta `americanoSetupOperations` (nueve métodos). `AmericanoUnavailableRoute` atiende `/*` e IDs inválidos sin llamadas futuras. Historial es setup persistido read-only con controles de zona ocultos; no conecta rondas/clasificación/playoffs. Generación no inyectada/deshabilitada; contrato completo18 operaciones y puesto de ronda v2 preservados.
+**Disponibilidad de consulta, no cambio de reglas:** App monta resolución canónica, setup y rondas con `mode="consultation"` bajo el guard admin existente. Review/historial ofrecen última ronda solo si `total_rounds` positivo coincide con `max_unlocked_round`; no ronda0. Clasificación/playoffs muestran etapa pendiente, sin APIs futuras. Setup inyecta diez métodos/round cuatro con `loadEvent` compartido;5.2/6.4 aceptadas,5.1 PARTIAL y UI editable/G2 pendientes. `read_only` de dominio no equivale a modo UI consulta. Contrato18 operaciones preservado; `/generate` no es endpoint publicado.
 
 **Lenguaje visual:** puesto operativo sobrio, ancho dentro del Layout admin, jerarquía evento → ronda → filas; números tabulares y separación clara de zonas. Reutilizar tokens/tema/tipografía existentes, contraste y foco visibles; no incorporar fuentes, librerías ni rediseñar público. Cabecera con ronda n/N, estado guardado, anterior/siguiente, `Ver tablas` y acción primaria explícita. Cajón lateral superpuesto, no barra fija. No animaciones decorativas que retrasen carga.
 
@@ -222,7 +222,7 @@ Las alternativas de permitir correcciones con ganador igual pese a descendientes
 
 ### D9. Ejecución multiagente por contratos y archivos disjuntos
 
-El usuario autorizó continuar y paralelizar3.2 y8.1/8.2 puro. Se recomienda **3–5 escritores simultáneos como máximo**, más revisores de solo lectura. Olas en `tasks.md` expresan disponibilidad, no autorización futura. En este cierre I solo escribe docs autorizados, incluidas notas de disponibilidad/procedencia proposal/specs AE/AK; no se presume ganancia de tiempo cuantificada.
+El usuario autorizó continuar y el trabajo paralelo previo; la entrega estable3.3 ya cuenta con revisiones independientes DOM y live. Se recomienda **3–5 escritores simultáneos como máximo**, más revisores de solo lectura para próximos slices autorizados. Olas expresan disponibilidad, no autorización futura. Este cierre de I solo integra los cinco docs principales y disponibilidad introductoria AE/AK, sin modificar implementación ni lanzar nuevos agentes.
 
 #### Contrato inicial y gates
 
@@ -282,7 +282,7 @@ U y R empiezan tras G0 con props/callbacks tipados y fixtures deterministas, sin
 | Calendario más largo con >6 cruces lógicos — **MEDIUM** | Split determinista con descansos explícitos; no prometer mínima cantidad de rondas. |
 | Dos administradores en distintos partidos — **MEDIUM** | Revisión global puede rechazar ediciones independientes; mensaje y recarga/comparación, aceptable para MVP. |
 | Sorteo humano queda obsoleto — **MEDIUM** | Invalida todas las resoluciones al cambiar scores; tarea humana adicional preferible a clasificación silenciosamente errónea. |
-| Desalineación entre aprobación deportiva y capacidades disponibles — **MEDIUM** | Zonas/random3.2 y puros8.1/8.2 aceptados; P2 resuelto. Generación/rondas/clasificación/playoffs no habilitados por esa aceptación;8.2 no acredita estado DB ni campeón persistido atómicamente. |
+| Desalineación entre aprobación deportiva y capacidades disponibles — **MEDIUM** | Backend3.1–4.3 aceptado, API13 y puertos setup10/round4 con loadEvent compartido; consulta real montada. UI editable/guard global5.3 y cinco APIs de clasificación/playoffs pendientes;8.2 pura no acredita campeón persistido. |
 | Respuesta de red perdida o sesión vencida | Mantener edición en memoria mientras esté montada, no desbloquear por optimismo; GET autenticado para reconciliar; guard antes de salida voluntaria. |
 | Colisiones de archivos, contratos divergentes o teardown de BD entre agentes — **MEDIUM** | G0, dueño único por archivo, pausa/escalamiento de consumidores afectados y recursos descartables por runner; si no hay aislamiento, serializar verificación. Hasta cinco escritores, sin refactor de arquitectura por paralelismo. |
 
@@ -315,6 +315,6 @@ Durante implementación, TDD focalizado donde ya existe runner: primero casos fa
 
 **No quedan reglas deportivas pendientes en D3/D6/D8** tras la aprobación del2026-10-21. No se reabre la entrevista ni se agregan alternativas.
 
-1. **3.1/3.2/8.1/8.2 aceptadas**,5/31 con0.1;8.2 solo pura tras P2 corregido/revisado. Setup nueve operaciones live20/20+typecheck PASS, sin cambios frontend posteriores informados;5.1/5.2 PARTIAL. Próximo corte3.3, generación/congelación sin resorteo todavía deshabilitada. Estrategia `auto-chain`/`stacked-to-main` solo planificación, sin GitOps/PRs; todo PR requiere pedido explícito.
-2. Revisar la adaptación futura de router/guard/logout (D7), fuera del slice actual, y decidir runner frontend solo si se quiere automatizar aceptación.
-3. Este cierre agrega únicamente8.2 pura;1.1/1.2/1.3 y2.x no aceptadas por suites verdes sin revisión dedicada;9.x/G2/G3/G4 incompletos. Estado DB/atomicidad de campeón pendientes8.3. Migración/activación productiva y evidencia PostgreSQL requieren aprobación separada. Notas de disponibilidad proposal/specs actualizadas sin reescribir requisitos; historia conservada, sin BD de usuario, build, commit ni despliegue.
+1. **14/31 aceptadas,17 pendientes:** nuevas4.2/4.3/5.2/6.4; API13, setup diez/round cuatro con `loadEvent` compartido, cinco futuras.4.3 FULL PASS con PostgreSQL independiente;5.1 PARTIAL. Estrategia `auto-chain`/`stacked-to-main` solo planificación, sin GitOps; todo PR requiere pedido explícito.
+2. Próximo proponer5.3: adaptación router/guard global dirty/logout voluntario (D7), con **confirmación humana antes de escrituras adyacentes a auth**. UI editable sigue deshabilitada; sin cambios previstos de login/cookies/permisos.
+3. **Pendientes:**2.x/5.3/6.1–6.3/9.x/G2/G3/G4; campeón persistido8.3 y activación productiva separados. Notas compactas y evidencia externa, sin artefactos runtime/logs en código productivo; conservar tests significativos. Trabajo nuevo **sin commit** tras `2bc5abf`.

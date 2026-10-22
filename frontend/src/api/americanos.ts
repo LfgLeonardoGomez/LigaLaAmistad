@@ -1,5 +1,8 @@
 import { api } from './client'
-import type { AmericanoDraftOperations, AmericanoSetupCapabilities, EventDetail, ListEventsResponse } from './americano-types'
+import type {
+  AmericanoDraftOperations, AmericanoRoundOperations, AmericanoSetupCapabilities,
+  EventDetail, GenerateFixtureResponse, ListEventsResponse, RoundResponse, SaveRoundResponse, StandingsResponse,
+} from './americano-types'
 
 const collection = '/admin/americanos'
 
@@ -16,9 +19,19 @@ export const americanoDraftOperations: AmericanoDraftOperations = {
     api.delete<EventDetail>(`${collection}/${eventId}/registrations/${registrationId}?expected_revision=${encodeURIComponent(expected_revision)}`),
 }
 
-// Only implemented setup capabilities are published; generation remains unavailable.
-export const americanoSetupOperations: AmericanoDraftOperations & Pick<AmericanoSetupCapabilities, 'setZones' | 'randomizeZones'> = {
+// Stable setup port publishes only implemented capabilities.
+export const americanoSetupOperations: AmericanoDraftOperations & AmericanoSetupCapabilities = {
   ...americanoDraftOperations,
   setZones: (eventId, request) => api.put<EventDetail>(`${collection}/${eventId}/zones`, request),
   randomizeZones: (eventId, request) => api.post<EventDetail>(`${collection}/${eventId}/zones/randomize`, request),
+  generateFixture: (eventId, request) => api.post<GenerateFixtureResponse>(`${collection}/${eventId}/fixture`, request),
+}
+
+// Stable round port: production mounting and editing are separate integration gates.
+export const americanoRoundOperations: AmericanoRoundOperations = {
+  loadEvent: americanoDraftOperations.loadEvent,
+  loadRound: (eventId, roundNumber) => api.get<RoundResponse>(`${collection}/${eventId}/rounds/${roundNumber}`),
+  loadStandings: (eventId) => api.get<StandingsResponse>(`${collection}/${eventId}/standings`),
+  saveRound: (eventId, roundNumber, request) =>
+    api.put<SaveRoundResponse>(`${collection}/${eventId}/rounds/${roundNumber}/results`, request),
 }

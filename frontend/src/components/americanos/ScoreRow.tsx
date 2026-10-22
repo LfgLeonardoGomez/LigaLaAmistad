@@ -17,6 +17,7 @@ export function ScoreRow({ match, zoneLabel, value, readOnly, errors, onChange, 
 
   function score(side: Side, name: string, rival: string) {
     const error = errors[side]
+    const games = side === 'a' ? value.games_a : value.games_b
     return (
       <div className="flex flex-col items-center gap-1">
         <input
@@ -24,7 +25,7 @@ export function ScoreRow({ match, zoneLabel, value, readOnly, errors, onChange, 
           type="text" inputMode="numeric" pattern="[0-9]" autoComplete="off"
           aria-label={`Games de ${name}, rival ${rival}, zona ${zoneLabel}, partido ${match.display_order}`}
           aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-${side}-error` : undefined}
-          value={side === 'a' ? value.games_a : value.games_b} readOnly={readOnly}
+          value={readOnly && games === '' ? '—' : games} readOnly={readOnly}
           onFocus={event => event.currentTarget.select()}
           onChange={event => update(side, event.currentTarget.value)}
           onKeyDown={event => {

@@ -93,9 +93,10 @@ export function AmericanoRoundPage(props: AmericanoRoundPageProps) {
   return <RoundWorkstation key={`${eventId}:${roundNumber}`} {...props} initialRound={loaded} />
 }
 
-function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange }: AmericanoRoundPageProps & { initialRound: RoundResponse }) {
+function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange, mode = 'editable' }: AmericanoRoundPageProps & { initialRound: RoundResponse }) {
   const [round, setRound] = useState(initialRound)
-  const draft = useRoundDraft(round)
+  const consultation = mode === 'consultation'
+  const draft = useRoundDraft(round, !consultation)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -114,16 +115,37 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange 
   const tableRequest = useRef(0)
   const busy = useRef(false)
   const alive = useRef(true)
+  const editable = useRef(!consultation)
+  const modeRevision = useRef(0)
   const dirtyCallback = useRef(onDirtyChange)
   const actions = useRef<Pick<DirtyNavigationDraft, 'save' | 'discard'>>({ save: async () => false, discard: () => false })
-  const canKeepEdit = conflict !== null && !isReadOnly(conflict) && sameMatchMembership(round, conflict)
-  const readOnly = isReadOnly(conflict ?? round) || (conflict !== null && !sameMatchMembership(round, conflict))
+  const canKeepEdit = !consultation && conflict !== null && !isReadOnly(conflict) && sameMatchMembership(round, conflict)
+  const groupsClosed = isReadOnly(consultation ? round : conflict ?? round)
+  const readOnly = consultation || groupsClosed || (conflict !== null && !sameMatchMembership(round, conflict))
   const matches = [...round.matches].sort((a, b) => a.display_order - b.display_order)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     alive.current = true
     return () => { alive.current = false; tableRequest.current++ }
   }, [])
+
+  useLayoutEffect(() => {
+    editable.current = !consultation
+    modeRevision.current++
+    if (consultation) {
+      setConflict(null)
+      setNeedsReconcile(false)
+      reconciliationPending.current = false
+      lastRequest.current = null
+      setPendingNavigation(null)
+      setNotice('')
+      setSaveError(null)
+    }
+  }, [consultation])
+
+  function canAct() {
+    return alive.current && editable.current
+  }
 
   const loadStandings = useCallback(async () => {
     const requestId = ++tableRequest.current
@@ -158,10 +180,12 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange 
   }
 
   async function reconcile(request: SaveRoundRequest): Promise<RoundResponse | null> {
+    if (!canAct()) return null
+    const revision = modeRevision.current
     setConflict(null)
     try {
       const canonical = await operations.loadRound(round.event_id, round.number)
-      if (!alive.current) return null
+      if (!canAct() || revision !== modeRevision.current) return null
       if (canonical.event_id !== round.event_id || canonical.number !== round.number || canonical.matches.length === 0 || canonical.matches.length > 6 ||
         canonical.matches.some(match => !canonical.zones.some(zone => zone.id === match.zone_id))) throw new Error('No se pudo verificar esta ronda.')
       const editStillMatches = draft.rows.length === request.results.length && draft.rows.every(row =>
@@ -174,13 +198,14 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange 
       setConflict(canonical)
       setSaveError('La ronda del servidor difiere de tu edición. Compará los resultados antes de continuar; no se reenviaron cambios.')
     } catch (error) {
-      if (alive.current) setSaveError(`No pudimos verificar el guardado. Tu edición sigue acá. ${messageOf(error)}`)
+      if (canAct() && revision === modeRevision.current) setSaveError(`No pudimos verificar el guardado. Tu edición sigue acá. ${messageOf(error)}`)
     }
     return null
   }
 
   async function persist(): Promise<RoundResponse | null> {
-    if (busy.current || readOnly || reconciliationPending.current) return null
+    if (!canAct() || busy.current || readOnly || reconciliationPending.current) return null
+    const revision = modeRevision.current
     const request = draft.validate()
     if (!request) {
       setSaveError('Completá todos los marcadores para guardar la ronda.')
@@ -196,7 +221,7 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange 
     lastRequest.current = request
     try {
       const response = await operations.saveRound(round.event_id, round.number, request)
-      if (!alive.current) return null
+      if (!canAct() || revision !== modeRevision.current) return null
       if (response.round.event_id !== round.event_id || response.round.number !== round.number || !matchesRequest(response.round, request)) {
         throw new Error('La respuesta no permite verificar el guardado. Conservamos tu edición.')
       }
@@ -204,7 +229,7 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange 
       setNotice('Ronda guardada.')
       return response.round
     } catch (error) {
-      if (!alive.current) return null
+      if (!canAct() || revision !== modeRevision.current) return null
       setNotice('')
       setSaveError(messageOf(error))
       const status = statusOf(error)
@@ -221,7 +246,7 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange 
   }
 
   function discard(): boolean {
-    if (busy.current || (reconciliationPending.current && !conflict)) return false
+    if (!canAct() || busy.current || (reconciliationPending.current && !conflict)) return false
     if (conflict) accept(conflict)
     else draft.reset()
     publishClean()
@@ -231,7 +256,7 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange 
   }
 
   function keepEdit() {
-    if (busy.current || !conflict || !canKeepEdit) return
+    if (!canAct() || busy.current || !conflict || !canKeepEdit) return
     setRound(conflict)
     draft.rebase(conflict)
     setConflict(null)
@@ -249,22 +274,26 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange 
   const saveDescriptor = useCallback(() => actions.current.save(), [])
   const discardDescriptor = useCallback(() => actions.current.discard(), [])
   function publishClean() {
-    dirtyCallback.current({ dirty: false, get pending() { return busy.current || reconciliationPending.current }, save: saveDescriptor, discard: discardDescriptor })
+    dirtyCallback.current(canAct() ? { dirty: false, get pending() { return canAct() && (busy.current || reconciliationPending.current) }, save: saveDescriptor, discard: discardDescriptor } : null)
   }
   const descriptor = useMemo<DirtyNavigationDraft>(() => ({
-    dirty: draft.dirty, get pending() { return busy.current || reconciliationPending.current }, save: saveDescriptor, discard: discardDescriptor,
+    dirty: draft.dirty, get pending() { return canAct() && (busy.current || reconciliationPending.current) }, save: saveDescriptor, discard: discardDescriptor,
   }), [draft.dirty, saving, needsReconcile, saveDescriptor, discardDescriptor])
-  useEffect(() => { dirtyCallback.current(descriptor) }, [descriptor])
-  useEffect(() => () => dirtyCallback.current(null), [])
-  useEffect(() => {
+  useLayoutEffect(() => {
+    onDirtyChange(consultation ? null : descriptor)
+    return () => onDirtyChange(null)
+  }, [descriptor, consultation, onDirtyChange])
+  useLayoutEffect(() => {
+    if (consultation) return
     function beforeUnload(event: BeforeUnloadEvent) {
+      if (!canAct()) return
       if (!draft.dirty && !busy.current && !reconciliationPending.current) return
       event.preventDefault()
       event.returnValue = ''
     }
     window.addEventListener('beforeunload', beforeUnload)
     return () => window.removeEventListener('beforeunload', beforeUnload)
-  }, [draft.dirty])
+  }, [draft.dirty, consultation])
 
   const registerInput = useCallback((matchId: number, side: Side, element: HTMLInputElement | null) => {
     const key = `${matchId}:${side}`
@@ -273,20 +302,27 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange 
   }, [])
 
   function advance(matchId: number, side: Side) {
+    if (!canAct() || readOnly || busy.current) return
     const index = matches.findIndex(match => match.id === matchId)
     const next = side === 'a' ? `${matchId}:b` : matches[index + 1] ? `${matches[index + 1]!.id}:a` : null
     if (next) inputs.current.get(next)?.focus()
   }
 
   function requestNavigation(target: AmericanoNavigation) {
+    if (!alive.current) return
+    if (target.kind === 'round' && (!Number.isSafeInteger(target.round_number) || target.round_number < 1 ||
+      target.round_number > Math.min(round.total_rounds, round.max_unlocked_round))) return
+    if (!editable.current) { onNavigate(target); return }
     if (busy.current) return
     if (draft.dirty || reconciliationPending.current) setPendingNavigation(target)
     else onNavigate(target)
   }
 
   async function saveFromForm() {
+    if (!canAct()) return
+    const revision = modeRevision.current
     const saved = await persist()
-    if (saved?.state === 'review' && saved.number === saved.total_rounds) onNavigate({ kind: 'qualification', event_id: saved.event_id })
+    if (canAct() && revision === modeRevision.current && saved?.state === 'review' && saved.number === saved.total_rounds) onNavigate({ kind: 'qualification', event_id: saved.event_id })
   }
 
   function captureDrawerFocus() {
@@ -294,18 +330,25 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange 
   }
 
   const restLabels = { bye: 'Descanso por ronda impar', capacity: 'Espera por capacidad', zone_finished: 'Zona finalizada' }
+  const roundStatus = groupsClosed ? 'Solo lectura · grupos cerrados'
+    : consultation ? 'Consulta · carga de resultados todavía no disponible'
+      : readOnly ? 'Solo lectura · composición de partidos modificada'
+        : draft.dirty || !round.saved ? 'Sin guardar' : 'Guardada'
+  const resultsNotice = consultation
+    ? groupsClosed ? 'Los resultados de grupos ya no se pueden modificar.' : 'Consulta de resultados guardados. La carga de resultados todavía no está disponible.'
+    : notice || (readOnly ? 'Los resultados de grupos ya no se pueden modificar.' : 'Completá los games y guardá toda la ronda. El último campo no guarda automáticamente.')
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-5 border-b border-ink-200 pb-5">
         <div>
           <p className="text-sm font-medium text-ink-500">{round.event_name}</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink-900">Ronda <span className="tabular-nums">{round.number}/{round.total_rounds}</span></h1>
-          <p className="mt-2 text-sm text-ink-600">{readOnly ? 'Solo lectura · grupos cerrados' : draft.dirty || !round.saved ? 'Sin guardar' : 'Guardada'}</p>
+          <p className="mt-2 text-sm text-ink-600">{roundStatus}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="secondary" disabled={saving || round.number <= 1}
+          <Button type="button" variant="secondary" disabled={(!consultation && saving) || round.number <= 1}
             onClick={() => requestNavigation({ kind: 'round', event_id: round.event_id, round_number: round.number - 1 })}>Anterior</Button>
-          <Button type="button" variant="secondary" disabled={saving || round.number >= round.total_rounds || round.number >= round.max_unlocked_round}
+          <Button type="button" variant="secondary" disabled={(!consultation && saving) || round.number >= round.total_rounds || round.number >= round.max_unlocked_round}
             onClick={() => requestNavigation({ kind: 'round', event_id: round.event_id, round_number: round.number + 1 })}>Siguiente</Button>
           <button ref={drawerButton} type="button" onPointerDown={captureDrawerFocus}
             onClick={() => {
@@ -331,7 +374,7 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange 
                   <legend className="sr-only">Zona {zone.label}, partido {match.display_order}</legend>
                   <p className="px-5 pt-3 text-xs font-semibold text-ink-500">Zona {zone.label} <span className="ml-2 font-normal">· Partido {match.display_order}</span></p>
                   <ScoreRow match={match} zoneLabel={zone.label} value={row} readOnly={readOnly || saving} errors={draft.errors[match.id] ?? {}}
-                    onChange={(matchId, side, value) => { draft.setScore(matchId, side, value); setNotice('') }}
+                    onChange={(matchId, side, value) => { if (!canAct() || readOnly || busy.current) return; draft.setScore(matchId, side, value); setNotice('') }}
                     onAdvance={advance} registerInput={registerInput} />
                 </fieldset>
               ) : null
@@ -346,39 +389,41 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange 
             </ul>
           </section>
         ) : null}
-        {saveError ? <Alert>{saveError}</Alert> : null}
-        {needsReconcile ? (
+        {!consultation && saveError ? <Alert>{saveError}</Alert> : null}
+        {!consultation && needsReconcile ? (
           <section className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-ink-800" aria-label="Comparación de ronda">
             {conflict ? <><h2 className="font-semibold">Resultados actuales del servidor · revisión {conflict.revision}</h2>
               <ul className="space-y-1">{[...conflict.matches].sort((a, b) => a.display_order - b.display_order).map(match => <li key={match.id}>{pairName(match.registration_a)} · {match.games_a ?? '—'} – {match.games_b ?? '—'} · {pairName(match.registration_b)}</li>)}</ul>
               <p>Tu edición sigue en los campos de arriba. Usar la ronda del servidor la descarta; conservarla adopta esta revisión sin enviar resultados.</p>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="secondary" disabled={saving} onClick={() => { accept(conflict); setNotice('Se cargó la ronda guardada del servidor.') }}>Usar ronda guardada</Button>
+                <Button type="button" variant="secondary" disabled={saving} onClick={() => { if (!canAct()) return; accept(conflict); setNotice('Se cargó la ronda guardada del servidor.') }}>Usar ronda guardada</Button>
                 <Button type="button" variant="secondary" disabled={saving || !canKeepEdit} onClick={keepEdit}>Conservar mi edición</Button>
               </div>
               {!canKeepEdit ? <p>No se puede reintentar: cambió la composición de los partidos o el servidor ya no permite editar esta ronda. Podés consultar tu edición y usar la ronda del servidor.</p> : null}</> : null}
             <Button type="button" variant="secondary" disabled={saving} onClick={async () => {
-              if (!lastRequest.current || busy.current) return
+              if (!canAct() || !lastRequest.current || busy.current) return
               busy.current = true; setSaving(true)
               try { await reconcile(lastRequest.current) } finally { busy.current = false; if (alive.current) setSaving(false) }
             }}>Volver a comprobar guardado</Button>
           </section>
         ) : null}
         <footer className="flex flex-wrap items-center justify-between gap-4">
-          <p role="status" aria-live="polite" className="text-sm text-ink-600">{notice || (readOnly ? 'Los resultados de grupos ya no se pueden modificar.' : 'Completá los games y guardá toda la ronda. El último campo no guarda automáticamente.')}</p>
+          <p role="status" aria-live="polite" className="text-sm text-ink-600">{resultsNotice}</p>
           {!readOnly ? <Button type="submit" disabled={saving || needsReconcile}>{saving ? 'Guardando…' : 'Guardar ronda completa'}</Button> : null}
         </footer>
       </form>
-      {round.state === 'review' ? <Button type="button" variant="secondary" disabled={saving} onClick={() => requestNavigation({ kind: 'qualification', event_id: round.event_id })}>Revisar clasificados</Button> : null}
+      {round.state === 'review' ? <Button type="button" variant="secondary" disabled={!consultation && saving} onClick={() => requestNavigation({ kind: 'qualification', event_id: round.event_id })}>Revisar clasificados</Button> : null}
       <StandingsDrawer open={drawerOpen} standings={standings} loading={standingsLoading} error={standingsError}
         onClose={() => { setDrawerOpen(false); drawerReturnFocus.current = null }} returnFocusTo={drawerReturnFocus.current} />
-      {pendingNavigation ? <RoundNavigationDialog canSave={!saving && !needsReconcile && !readOnly} canDiscard={!saving && (!needsReconcile || conflict !== null)} onResolve={action => {
+      {!consultation && pendingNavigation ? <RoundNavigationDialog canSave={!saving && !needsReconcile && !readOnly} canDiscard={!saving && (!needsReconcile || conflict !== null)} onResolve={action => {
         const target = pendingNavigation
+        const revision = modeRevision.current
         setPendingNavigation(null)
         // Wait until the native dialog has released focus/inertness before validating.
         requestAnimationFrame(async () => {
-          if (action === 'discard' && discard()) onNavigate(target)
-          else if (action === 'save' && await persist()) onNavigate(target)
+          if (!canAct() || revision !== modeRevision.current) return
+          const resolved = action === 'discard' ? discard() : action === 'save' ? await persist() : false
+          if (resolved && canAct() && revision === modeRevision.current) onNavigate(target)
         })
       }} /> : null}
     </div>

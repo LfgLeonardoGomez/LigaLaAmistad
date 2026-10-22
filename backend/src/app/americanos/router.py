@@ -1,4 +1,4 @@
-"""Private draft operations. Validation errors are local to this router."""
+"""Private event operations. Validation errors are local to this router."""
 
 from typing import Annotated
 
@@ -100,3 +100,27 @@ def set_zones(event_id: PathId, data: dto.SetZonesRequest, session: SessionDep) 
 @router.post("/{event_id}/zones/randomize")
 def randomize_zones(event_id: PathId, data: dto.RevisionRequest, session: SessionDep) -> dto.EventDetail:
     return service.randomize_zones(session, event_id, data)
+
+
+@router.post("/{event_id}/fixture")
+def generate_fixture(
+    event_id: PathId, data: dto.RevisionRequest, session: SessionDep,
+) -> dto.GenerateFixtureResponse:
+    return service.generate_fixture(session, event_id, data)
+
+
+@router.get("/{event_id}/rounds/{number}")
+def load_round(event_id: PathId, number: PathId, session: SessionDep) -> dto.RoundResponse:
+    return service.load_round(session, event_id, number)
+
+
+@router.get("/{event_id}/standings")
+def load_standings(event_id: PathId, session: SessionDep) -> dto.StandingsResponse:
+    return service.load_standings(session, event_id)
+
+
+@router.put("/{event_id}/rounds/{number}/results")
+def save_round(
+    event_id: PathId, number: PathId, data: dto.SaveRoundRequest, session: SessionDep,
+) -> dto.SaveRoundResponse:
+    return service.save_round(session, event_id, number, data)

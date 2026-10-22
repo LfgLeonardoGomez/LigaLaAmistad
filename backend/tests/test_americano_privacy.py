@@ -152,9 +152,31 @@ def test_draft_operations_leave_nonempty_league_and_public_responses_unchanged(a
             "expected_revision": 5, "zone_count": 2, "zone_a_registration_ids": [],
         })
         assert response.status_code == 200
-        assert api.client.post(f"{BASE}/{detail['id']}/zones/randomize", json={
+        response = api.client.post(f"{BASE}/{detail['id']}/zones/randomize", json={
             "expected_revision": 6,
-        }).status_code == 200
+        })
+        assert response.status_code == 200
+        draft = response.json()
+        for _ in range(4):
+            draft = add_registration(api, draft)
+        response = api.client.put(f"{BASE}/{draft['id']}/zones", json={
+            "expected_revision": draft["revision"], "zone_count": 2,
+            "zone_a_registration_ids": [r["id"] for r in draft["registrations"][:2]],
+        })
+        assert response.status_code == 200
+        response = api.client.post(f"{BASE}/{draft['id']}/fixture", json={
+            "expected_revision": response.json()["revision"],
+        })
+        assert response.status_code == 200 and response.json()["event"]["state"] == "groups"
+        round_response = api.client.get(f"{BASE}/{draft['id']}/rounds/1")
+        assert round_response.status_code == 200
+        assert api.client.get(f"{BASE}/{draft['id']}/standings").status_code == 200
+        round_ = round_response.json()
+        response = api.client.put(f"{BASE}/{draft['id']}/rounds/1/results", json={
+            "expected_revision": round_["revision"],
+            "results": [{"match_id": match["id"], "games_a": 0, "games_b": 0} for match in round_["matches"]],
+        })
+        assert response.status_code == 200 and response.json()["round"]["state"] == "review"
     finally:
         sql_event.remove(api.engine, "before_cursor_execute", executed)
     assert statements and all("americano_" in sql or "admin_users" in sql for sql in statements)
@@ -162,7 +184,7 @@ def test_draft_operations_leave_nonempty_league_and_public_responses_unchanged(a
     assert public_snapshot() == public_before
 
 
-def test_only_the_nine_authorized_operations_are_published(americano_api):
+def test_only_the_thirteen_authorized_operations_are_published(americano_api):
     from app.main import app
 
     paths = app.openapi()["paths"]
@@ -176,6 +198,10 @@ def test_only_the_nine_authorized_operations_are_published(americano_api):
         ("DELETE", BASE + "/{event_id}/registrations/{registration_id}"),
         ("PUT", BASE + "/{event_id}/zones"),
         ("POST", BASE + "/{event_id}/zones/randomize"),
+        ("POST", BASE + "/{event_id}/fixture"),
+        ("GET", BASE + "/{event_id}/rounds/{number}"),
+        ("GET", BASE + "/{event_id}/standings"),
+        ("PUT", BASE + "/{event_id}/rounds/{number}/results"),
     }
 
 
@@ -219,3 +245,70 @@ def test_zone_mutations_and_foreign_payload_never_change_another_event(americano
     })
     assert response.status_code == 200 and response.json()["zone_count"] == 1
     assert api.client.get(f"{BASE}/{second['id']}").json() == second
+
+
+@pytest.mark.parametrize("mode", ["anonymous", "expired", "inactive"])
+def test_fixture_generation_requires_real_admin_guard_without_mutation(americano_api, mode):
+    from app.americanos.models import AmericanoGroupMatch, AmericanoRound
+
+    api = americano_api
+    detail = add_registration(api, add_registration(api, create_event(api)))
+    api.authenticate(mode)
+    response = api.client.post(f"{BASE}/{detail['id']}/fixture", json={"expected_revision": True})
+    assert response.status_code == 401 and response.json() == {"detail": "Not authenticated"}
+    api.authenticate()
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == detail
+    with Session(api.engine) as session:
+        assert session.exec(select(AmericanoRound)).all() == []
+        assert session.exec(select(AmericanoGroupMatch)).all() == []
+
+
+def test_fixture_generation_only_persists_children_for_its_own_event(americano_api):
+    from app.americanos.models import AmericanoGroupMatch, AmericanoRound
+
+    api = americano_api
+    first = add_registration(api, add_registration(api, create_event(api)))
+    other = add_registration(api, add_registration(api, create_event(api)))
+    response = api.client.post(f"{BASE}/{first['id']}/fixture", json={"expected_revision": first["revision"]})
+    assert response.status_code == 200
+    assert api.client.get(f"{BASE}/{other['id']}").json() == other
+    with Session(api.engine) as session:
+        rounds = session.exec(select(AmericanoRound)).all()
+        matches = session.exec(select(AmericanoGroupMatch)).all()
+        assert len(rounds) == len(matches) == 1
+        assert rounds[0].event_id == matches[0].event_id == first["id"]
+        assert {matches[0].registration_a_id, matches[0].registration_b_id} == {
+            r["id"] for r in first["registrations"]
+        }
+
+
+@pytest.mark.parametrize("mode", ["anonymous", "expired", "inactive"])
+@pytest.mark.parametrize("suffix", ["rounds/1", "standings"])
+def test_round_and_standings_reads_require_real_admin_guard(americano_api, mode, suffix):
+    api = americano_api
+    event = add_registration(api, add_registration(api, create_event(api)))
+    response = api.client.post(f"{BASE}/{event['id']}/fixture", json={"expected_revision": event["revision"]})
+    assert response.status_code == 200
+    event = response.json()["event"]
+    api.authenticate(mode)
+    response = api.client.get(f"{BASE}/{event['id']}/{suffix}")
+    assert response.status_code == 401 and response.json() == {"detail": "Not authenticated"}
+    api.authenticate()
+    assert api.client.get(f"{BASE}/{event['id']}").json() == event
+
+
+@pytest.mark.parametrize("mode", ["anonymous", "expired", "inactive"])
+def test_round_results_require_real_admin_guard_even_for_invalid_body(americano_api, mode):
+    api = americano_api
+    event = add_registration(api, add_registration(api, create_event(api)))
+    response = api.client.post(f"{BASE}/{event['id']}/fixture", json={"expected_revision": event["revision"]})
+    assert response.status_code == 200
+    event = response.json()["event"]
+    api.authenticate(mode)
+    response = api.client.put(f"{BASE}/{event['id']}/rounds/1/results", json={
+        "expected_revision": True, "results": [],
+    })
+    assert response.status_code == 401 and response.json() == {"detail": "Not authenticated"}
+    api.authenticate()
+    assert api.client.get(f"{BASE}/{event['id']}").json() == event
+    assert api.client.get(f"{BASE}/{event['id']}/rounds/1").json()["saved"] is False

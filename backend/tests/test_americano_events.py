@@ -1,6 +1,7 @@
 """Draft request contracts, revisions and atomic zone persistence."""
 
 import datetime
+from itertools import combinations
 
 import pytest
 from pydantic import TypeAdapter
@@ -8,9 +9,10 @@ from sqlalchemy import event as sql_event
 from sqlmodel import Session, select
 
 from app.americanos.models import (
-    AmericanoEvent, AmericanoEventState, AmericanoRegistration, AmericanoRound, AmericanoZone,
+    AmericanoEvent, AmericanoEventState, AmericanoGroupMatch, AmericanoRegistration,
+    AmericanoRound, AmericanoZone,
 )
-from app.americanos.schemas import EventDetail, ListEventsResponse
+from app.americanos.schemas import EventDetail, GenerateFixtureResponse, ListEventsResponse
 
 from .americano_fixtures import BASE, add_registration, americano_api, create_event  # noqa: F401
 
@@ -922,3 +924,430 @@ def test_zone_mutations_require_closed_strict_revision_payload(americano_api, op
     assert body["code"] == "validation_error" and body["fields"]
     assert body["detail"] == body["message"]
     assert api.client.get(f"{BASE}/{detail['id']}").json() == detail
+
+
+def test_generate_fixture_persists_one_pending_match_and_returns_first_round(americano_api):
+    api = americano_api
+    detail = add_registration(api, add_registration(api, create_event(api)))
+    response = api.client.post(f"{BASE}/{detail['id']}/fixture", json={
+        "expected_revision": detail["revision"],
+    })
+    assert response.status_code == 200, response.text
+    generated = response.json()
+    GenerateFixtureResponse.model_validate(generated)
+    event, first = generated["event"], generated["first_round"]
+    assert event == detail | {
+        "state": "groups", "revision": detail["revision"] + 1,
+        "total_rounds": 1, "max_unlocked_round": 1, "can_generate": False,
+        "continuation": {"kind": "round", "round_number": 1},
+    }
+    assert first["event_id"] == detail["id"] and first["event_name"] == detail["name"]
+    assert first["revision"] == event["revision"] and first["groups_revision"] == 0
+    assert (first["number"], first["total_rounds"], first["max_unlocked_round"]) == (1, 1, 1)
+    assert first["state"] == "groups"
+    assert not first["saved"] and not first["locked"] and not first["read_only"]
+    assert first["zones"] == event["zones"] and first["resting"] == []
+    assert len(first["matches"]) == 1
+    match = first["matches"][0]
+    assert match["registration_a"] == detail["registrations"][0]
+    assert match["registration_b"] == detail["registrations"][1]
+    assert match["zone_id"] == detail["zones"][0]["id"] and match["display_order"] == 1
+    assert match["games_a"] is None and match["games_b"] is None
+    with Session(api.engine) as session:
+        rounds = session.exec(select(AmericanoRound).where(AmericanoRound.event_id == detail["id"])).all()
+        matches = session.exec(select(AmericanoGroupMatch).where(
+            AmericanoGroupMatch.event_id == detail["id"],
+        )).all()
+        assert len(rounds) == len(matches) == 1
+        assert rounds[0].number == 1 and rounds[0].saved_at is None
+        assert matches[0].id == match["id"] and matches[0].round_id == rounds[0].id
+        assert matches[0].games_a is None and matches[0].games_b is None
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == event
+    assert api.client.get(BASE).json() == [{key: event[key] for key in detail if key not in {
+        "zones", "registrations", "quotas", "can_generate", "configuration_issues",
+        "confirmed_at", "champion_registration_id",
+    }}]
+
+
+def _fixture_draft(api, sizes, stage="final"):
+    detail = create_event(api, zone_count=len(sizes), start_stage=stage)
+    for index in range(sum(sizes)):
+        detail = add_registration(api, detail, first=f"Jugador {index}", second=f"Compañero {index}")
+    response = _assign_zones(api, "zones", detail, zone_a_registration_ids=[
+        r["id"] for r in detail["registrations"][:sizes[0]]
+    ])
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def _generate_fixture(api, detail, **changes):
+    return api.client.post(f"{BASE}/{detail['id']}/fixture", json={
+        "expected_revision": detail["revision"], **changes,
+    })
+
+
+def test_generate_fixture_two_singletons_enters_review_without_empty_rounds(americano_api):
+    api = americano_api
+    detail = _fixture_draft(api, (1, 1))
+    response = _generate_fixture(api, detail)
+    assert response.status_code == 200, response.text
+    actual = response.json()
+    GenerateFixtureResponse.model_validate(actual)
+    assert actual["first_round"] is None
+    assert actual["event"] == detail | {
+        "state": "review", "revision": detail["revision"] + 1, "can_generate": False,
+        "continuation": {"kind": "qualification"},
+    }
+    assert actual["event"]["total_rounds"] == actual["event"]["max_unlocked_round"] == 0
+    assert actual["event"]["confirmed_at"] is None and actual["event"]["champion_registration_id"] is None
+    with Session(api.engine) as session:
+        assert session.exec(select(AmericanoRound)).all() == []
+        assert session.exec(select(AmericanoGroupMatch)).all() == []
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == actual["event"]
+
+
+@pytest.mark.parametrize("sizes,stage", [
+    ((7,), "quarterfinal"), ((3, 5), "quarterfinal"),
+    ((3,), "semifinal"), ((1, 3), "semifinal"),
+    ((1,), "final"), ((0, 2), "final"), ((0,), "final"),
+])
+def test_generate_fixture_rejects_insufficient_per_zone_quotas_without_writes(americano_api, sizes, stage):
+    api = americano_api
+    detail = _fixture_draft(api, sizes, stage)
+    assert detail["can_generate"] is False
+    response = _generate_fixture(api, detail)
+    assert response.status_code == 422, response.text
+    body = response.json()
+    assert body["code"] == "invalid_configuration" and body["detail"] == body["message"]
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == detail
+    with Session(api.engine) as session:
+        assert session.exec(select(AmericanoRound)).all() == []
+        assert session.exec(select(AmericanoGroupMatch)).all() == []
+
+
+@pytest.mark.parametrize("membership", ["unassigned", "foreign", "missing"])
+def test_generate_fixture_checks_actual_zone_membership_not_only_quota_totals(americano_api, membership):
+    api = americano_api
+    detail = _fixture_draft(api, (2, 2))
+    other = _fixture_draft(api, (2,))
+    zone_id = {"unassigned": None, "foreign": other["zones"][0]["id"], "missing": 99999}[membership]
+    # Simulate an invalid legacy row only in the fixture's private in-memory DB.
+    # Valid production FKs already prohibit the foreign/missing cases.
+    with api.engine.connect() as connection:
+        connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        connection.execute(AmericanoRegistration.__table__.update().where(
+            AmericanoRegistration.id == detail["registrations"][0]["id"],
+        ).values(zone_id=zone_id))
+        connection.commit()
+        connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+        connection.commit()
+    before = api.client.get(f"{BASE}/{detail['id']}").json()
+    response = _generate_fixture(api, before)
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "invalid_configuration"
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == before
+    assert api.client.get(f"{BASE}/{other['id']}").json() == other
+    with Session(api.engine) as session:
+        assert session.exec(select(AmericanoRound)).all() == []
+        assert session.exec(select(AmericanoGroupMatch)).all() == []
+
+
+def test_generate_fixture_rejects_zone_count_inconsistent_with_stored_zones(americano_api):
+    api = americano_api
+    detail = _fixture_draft(api, (2,))
+    with Session(api.engine) as session:
+        event = session.get(AmericanoEvent, detail["id"])
+        event.zone_count = 2
+        session.add(event)
+        session.commit()
+    response = _generate_fixture(api, detail)
+    assert response.status_code == 422
+    assert response.json()["code"] == "invalid_configuration"
+    with Session(api.engine) as session:
+        assert session.get(AmericanoEvent, detail["id"]).revision == detail["revision"]
+        assert session.exec(select(AmericanoRound)).all() == []
+
+
+@pytest.mark.parametrize("sizes,stage,match_count,round_sizes,rest_reasons", [
+    ((8,), "quarterfinal", 28, [4] * 7, []),
+    ((7, 7), "quarterfinal", 42, [6] * 7, ["bye", "bye"]),
+    ((16,), "quarterfinal", 120, [6, 2] * 15, ["capacity"] * 4),
+    ((8, 8), "quarterfinal", 56, [6, 2] * 7, ["capacity"] * 4),
+    ((5, 4), "semifinal", 16, [4, 4, 4, 2, 2], ["bye"]),
+    ((4,), "semifinal", 6, [2] * 3, []),
+    ((4, 4), "quarterfinal", 12, [4] * 3, []),
+    ((1, 3), "final", 3, [1] * 3, ["zone_finished", "bye"]),
+    ((3, 1), "final", 3, [1] * 3, ["bye", "zone_finished"]),
+])
+def test_generate_fixture_persists_complete_intrazone_berger_schedule(
+    americano_api, sizes, stage, match_count, round_sizes, rest_reasons,
+):
+    from app.americanos.fixture import ZoneInput, build_fixture
+
+    api = americano_api
+    detail = _fixture_draft(api, sizes, stage)
+    response = _generate_fixture(api, detail)
+    assert response.status_code == 200, response.text
+    actual = response.json()
+    GenerateFixtureResponse.model_validate(actual)
+    event, first = actual["event"], actual["first_round"]
+    assert event["registrations"] == detail["registrations"] and event["zones"] == detail["zones"]
+    assert (event["state"], event["revision"], event["groups_revision"]) == ("groups", detail["revision"] + 1, 0)
+    assert (event["total_rounds"], event["saved_rounds"], event["max_unlocked_round"]) == (len(round_sizes), 0, 1)
+    assert event["continuation"] == {"kind": "round", "round_number": 1}
+    assert first["total_rounds"] == len(round_sizes) and first["number"] == 1
+    assert [rest["reason"] for rest in first["resting"]] == rest_reasons
+    playing = {r[side]["id"] for r in first["matches"] for side in ("registration_a", "registration_b")}
+    resting = [rest["registration"]["id"] for rest in first["resting"]]
+    assert set(resting) == {r["id"] for r in detail["registrations"]} - playing
+    assert len(resting) == len(set(resting)) and len(playing) == 2 * len(first["matches"])
+    by_id = {r["id"]: r for r in detail["registrations"]}
+    expected_pairs = {
+        (zone["id"], a, b) for zone in detail["zones"]
+        for a, b in combinations(sorted(r["id"] for r in detail["registrations"] if r["zone_id"] == zone["id"]), 2)
+    }
+    # The pure algorithm is the adapter's oracle, not a reimplementation of Berger.
+    expected_fixture = build_fixture([
+        ZoneInput(zone["id"], zone["label"], tuple(
+            r["id"] for r in detail["registrations"] if r["zone_id"] == zone["id"]
+        )) for zone in detail["zones"]
+    ])
+    assert [(rest["registration"]["id"], rest["reason"]) for rest in first["resting"]] == [
+        (rest.registration_id, rest.reason) for rest in expected_fixture[0].resting
+    ]
+    with Session(api.engine) as session:
+        rounds = session.exec(select(AmericanoRound).where(
+            AmericanoRound.event_id == detail["id"],
+        ).order_by(AmericanoRound.number)).all()
+        matches = session.exec(select(AmericanoGroupMatch).where(
+            AmericanoGroupMatch.event_id == detail["id"],
+        )).all()
+        assert [r.number for r in rounds] == list(range(1, len(round_sizes) + 1))
+        assert all(r.saved_at is None for r in rounds)
+        assert len(matches) == match_count == len(expected_pairs)
+        assert {(m.zone_id, m.registration_a_id, m.registration_b_id) for m in matches} == expected_pairs
+        for round_, expected_size, planned in zip(rounds, round_sizes, expected_fixture, strict=True):
+            round_matches = sorted((m for m in matches if m.round_id == round_.id), key=lambda m: m.display_order)
+            assert round_.number == planned.number
+            assert [(m.zone_id, m.registration_a_id, m.registration_b_id, m.display_order) for m in round_matches] == [
+                (m.zone_id, m.registration_a_id, m.registration_b_id, m.display_order) for m in planned.matches
+            ]
+            assert len(round_matches) == expected_size <= 6
+            assert [m.display_order for m in round_matches] == list(range(1, expected_size + 1))
+            assert len({i for m in round_matches for i in (m.registration_a_id, m.registration_b_id)}) == 2 * expected_size
+            assert all(m.registration_a_id < m.registration_b_id and m.games_a is None and m.games_b is None
+                       and by_id[m.registration_a_id]["zone_id"] == m.zone_id == by_id[m.registration_b_id]["zone_id"]
+                       for m in round_matches)
+            if round_.number == 1:
+                assert [(m["id"], m["display_order"]) for m in first["matches"]] == [
+                    (m.id, m.display_order) for m in round_matches
+                ]
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == event
+
+
+@pytest.mark.parametrize("assignment", ["manual", "random"])
+def test_generate_fixture_preserves_saved_distribution_without_any_shuffle(americano_api, monkeypatch, assignment):
+    from app.americanos import service
+
+    api = americano_api
+    detail = _fixture_draft(api, (5, 4), "semifinal")
+    if assignment == "random":
+        response = _assign_zones(api, "randomize", detail)
+        assert response.status_code == 200
+        detail = response.json()
+
+    def forbidden_shuffle(_registrations):
+        raise AssertionError("Generation must not redistribute registrations")
+
+    monkeypatch.setattr(service, "shuffle", forbidden_shuffle)
+    response = _generate_fixture(api, detail)
+    assert response.status_code == 200
+    assert response.json()["event"]["registrations"] == detail["registrations"]
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == response.json()["event"]
+
+
+@pytest.mark.parametrize("sizes", [(2,), (1, 1)])
+@pytest.mark.parametrize("operation", ["update", "add", "rename", "delete", "zones", "randomize"])
+def test_generate_fixture_freezes_all_existing_configuration_mutations(americano_api, sizes, operation):
+    api = americano_api
+    detail = _fixture_draft(api, sizes)
+    response = _generate_fixture(api, detail)
+    assert response.status_code == 200
+    event = response.json()["event"]
+    response = _mutate(api, operation, event)
+    assert response.status_code == 409
+    body = response.json()
+    assert body["code"] == "state_conflict" and body["current_revision"] == event["revision"]
+    assert body["detail"] == body["message"]
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == event
+
+
+@pytest.mark.parametrize("sizes", [(2,), (1, 1)])
+def test_generate_fixture_retries_cannot_regenerate_or_advance_revision(americano_api, sizes):
+    api = americano_api
+    detail = _fixture_draft(api, sizes)
+    response = _generate_fixture(api, detail)
+    assert response.status_code == 200
+    event = response.json()["event"]
+    with Session(api.engine) as session:
+        before = [m.model_dump() for m in session.exec(select(AmericanoGroupMatch)).all()]
+    for revision, code in [(detail["revision"], "revision_conflict"), (event["revision"], "state_conflict")]:
+        response = _generate_fixture(api, event, expected_revision=revision)
+        assert response.status_code == 409 and response.json()["code"] == code
+        assert response.json()["current_revision"] == event["revision"]
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == event
+    with Session(api.engine) as session:
+        assert [m.model_dump() for m in session.exec(select(AmericanoGroupMatch)).all()] == before
+
+
+@pytest.mark.parametrize("revision_offset", [-1, 1])
+def test_generate_fixture_rejects_stale_and_future_revisions_before_fixture_work(americano_api, monkeypatch, revision_offset):
+    from app.americanos import service
+
+    api = americano_api
+    detail = _fixture_draft(api, (2,))
+
+    def forbidden_build(_zones):
+        raise AssertionError("A rejected request must not generate")
+
+    monkeypatch.setattr(service, "build_fixture", forbidden_build)
+    response = _generate_fixture(api, detail, expected_revision=detail["revision"] + revision_offset)
+    assert response.status_code == 409 and response.json()["code"] == "revision_conflict"
+    assert response.json()["fields"][0]["path"] == ["expected_revision"]
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == detail
+
+
+@pytest.mark.parametrize("payload", [{}, {"expected_revision": True}, {"expected_revision": "1"},
+                                   {"expected_revision": 1.0}, {"expected_revision": 0},
+                                   {"expected_revision": None}, {"expected_revision": 1, "zone_count": 2}])
+def test_generate_fixture_requires_closed_strict_revision_input(americano_api, payload):
+    api = americano_api
+    detail = _fixture_draft(api, (2,))
+    response = api.client.post(f"{BASE}/{detail['id']}/fixture", json=payload)
+    assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "validation_error" and body["fields"]
+    assert body["detail"] == body["message"]
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == detail
+
+
+def test_generate_fixture_missing_event_is_flat_404(americano_api):
+    response = _generate_fixture(americano_api, {"id": 99999, "revision": 1})
+    assert response.status_code == 404
+    body = response.json()
+    assert body["code"] == "not_found" and body["detail"] == body["message"]
+    assert "current_revision" not in body
+
+
+@pytest.mark.parametrize("failure", ["round", "match", "commit"])
+def test_generate_fixture_rolls_back_partial_rows_state_and_revision(americano_api, failure):
+    api = americano_api
+    detail = _fixture_draft(api, (4,))
+    inserted = []
+
+    def fail_insert(_connection, _cursor, statement, _parameters, _context, _many):
+        target = "americano_rounds" if failure == "round" else "americano_group_matches"
+        if statement.startswith(f"INSERT INTO {target}"):
+            inserted.append(statement)
+            if len(inserted) == 2:
+                raise RuntimeError("injected generation insert failure")
+
+    def fail_commit(session):
+        if session.bind is api.engine:
+            raise RuntimeError("injected generation commit failure")
+
+    sql_event.listen(api.engine, "before_cursor_execute", fail_insert)
+    if failure == "commit":
+        sql_event.listen(Session, "before_commit", fail_commit)
+        sql_event.remove(api.engine, "before_cursor_execute", fail_insert)
+    try:
+        with pytest.raises(RuntimeError, match="injected generation"):
+            _generate_fixture(api, detail)
+    finally:
+        if failure == "commit":
+            sql_event.remove(Session, "before_commit", fail_commit)
+        else:
+            sql_event.remove(api.engine, "before_cursor_execute", fail_insert)
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == detail
+    with Session(api.engine) as session:
+        assert session.exec(select(AmericanoRound)).all() == []
+        assert session.exec(select(AmericanoGroupMatch)).all() == []
+    recovered = _generate_fixture(api, detail)
+    assert recovered.status_code == 200
+    assert recovered.json()["event"]["revision"] == detail["revision"] + 1
+    with Session(api.engine) as session:
+        assert len(session.exec(select(AmericanoRound)).all()) == 3
+        assert len(session.exec(select(AmericanoGroupMatch)).all()) == 6
+
+
+@pytest.mark.parametrize("sizes", [(2,), (1, 1)])
+def test_generate_fixture_locks_event_first_and_commits_exactly_once(americano_api, sizes):
+    from sqlalchemy.dialects import postgresql
+
+    api = americano_api
+    detail = _fixture_draft(api, sizes)
+    statements, commits = [], []
+
+    def executed(_connection, clause, _multiparams, _params, _options):
+        statements.append(str(clause.compile(dialect=postgresql.dialect())))
+
+    def committed(_connection):
+        commits.append("commit")
+
+    sql_event.listen(api.engine, "before_execute", executed)
+    sql_event.listen(api.engine, "commit", committed)
+    try:
+        response = _generate_fixture(api, detail)
+    finally:
+        sql_event.remove(api.engine, "before_execute", executed)
+        sql_event.remove(api.engine, "commit", committed)
+    assert response.status_code == 200
+    assert "FROM admin_users" in statements[0]
+    assert "FROM americano_events" in statements[1] and "FOR UPDATE" in statements[1]
+    assert commits == ["commit"]
+    assert response.json()["event"]["revision"] == detail["revision"] + 1
+    assert response.json()["event"]["groups_revision"] == 0
+
+
+@pytest.mark.parametrize("sizes", [(2,), (1, 1)])
+@pytest.mark.parametrize("use_current_revision", [False, True])
+def test_generate_fixture_second_session_refreshes_cached_draft_before_rejecting_retry(
+    americano_api, sizes, use_current_revision,
+):
+    from app.americanos import service
+    from app.americanos.schemas import RevisionRequest
+
+    api = americano_api
+    detail = _fixture_draft(api, sizes)
+    # Ordered transactions, NOT simultaneous writers or evidence of SQLite row locks.
+    with Session(api.engine, expire_on_commit=False) as observer:
+        cached = observer.get(AmericanoEvent, detail["id"])
+        observer.commit()  # release the read transaction but retain its stale identity
+        with Session(api.engine) as writer:
+            generated = service.generate_fixture(writer, detail["id"], RevisionRequest(
+                expected_revision=detail["revision"],
+            ))
+        assert cached.state == AmericanoEventState.DRAFT and cached.revision == detail["revision"]
+        revision = generated.event.revision if use_current_revision else detail["revision"]
+        with pytest.raises(service.AmericanoError) as error:
+            service.generate_fixture(observer, detail["id"], RevisionRequest(expected_revision=revision))
+        assert error.value.status == 409
+        assert error.value.body.code == ("state_conflict" if use_current_revision else "revision_conflict")
+        assert error.value.body.current_revision == generated.event.revision
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == generated.event.model_dump()
+    with Session(api.engine) as session:
+        assert len(session.exec(select(AmericanoRound)).all()) == (1 if sizes == (2,) else 0)
+        assert len(session.exec(select(AmericanoGroupMatch)).all()) == (1 if sizes == (2,) else 0)
+
+
+@pytest.mark.parametrize("changes", [{"name": "No cambiar"}, {"zone_count": 2}, {"start_stage": "quarterfinal"}])
+@pytest.mark.parametrize("sizes", [(2,), (1, 1)])
+def test_generate_fixture_freezes_each_event_configuration_field(americano_api, sizes, changes):
+    api = americano_api
+    detail = _fixture_draft(api, sizes)
+    response = _generate_fixture(api, detail)
+    assert response.status_code == 200
+    generated = response.json()["event"]
+    response = api.client.patch(f"{BASE}/{detail['id']}", json={"expected_revision": generated["revision"], **changes})
+    assert response.status_code == 409 and response.json()["code"] == "state_conflict"
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == generated
