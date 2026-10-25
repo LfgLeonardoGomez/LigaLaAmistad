@@ -14,6 +14,7 @@ from app.core.config import settings
 
 # Importing the model modules is what fills SQLModel.metadata. Without them,
 # autogenerate would think every table should be dropped.
+from app.americanos import models as americano_models  # noqa: F401,E402
 from app.auth import models as auth_models  # noqa: F401,E402
 from app.matches import models as match_models  # noqa: F401,E402
 from app.sponsors import models as sponsor_models  # noqa: F401,E402

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
+import { useGuardedLogout } from '../pages/americanos/useDirtyNavigation'
 import { AdminThemeToggle } from '../theme/AdminTheme'
 import { Modal } from './Modal'
 import { PasswordForm } from './PasswordForm'
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
 
 export function Layout() {
   const { admin, logout } = useAuth()
+  const requestLogout = useGuardedLogout()
   const [changingPassword, setChangingPassword] = useState(false)
 
   return (
@@ -41,7 +43,7 @@ export function Layout() {
               {admin?.email}
             </button>
             <AdminThemeToggle />
-            <Button variant="secondary" onClick={() => void logout()}>
+            <Button variant="secondary" onClick={() => requestLogout(logout)}>
               Salir
             </Button>
           </div>

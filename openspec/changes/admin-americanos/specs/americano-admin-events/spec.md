@@ -4,7 +4,7 @@
 
 Administrar eventos privados independientes con parejas fijas y generar un fixture intrazona completo, jugable en hasta seis canchas simultáneas.
 
-**Disponibilidad actualizada2026-10-22:** D3 aprobado; [contrato2.1.0](../../contracts.md) intacto. **14/31 aceptadas,17 pendientes** según [checklist](../../tasks.md); nuevas4.2/4.3 con PostgreSQL independiente FULL PASS y5.2/6.4 por auditorías dedicadas. API13, setup10/round4 con `loadEvent` compartido; cinco APIs futuras. Generación confirmada/congelación y consulta real protegida de rondas/tablas disponibles; UI editable deshabilitada hasta aprobar5.3.5.1 PARTIAL;2.x/5.3/6.1–6.3/9.x/G2/G3/G4 pendientes. Próximo proponer5.3 guard global/logout, confirmación humana previa a escrituras adyacentes a auth; activación productiva separada. [Procedencia/historia](../../verification.md); solo disponibilidad, requisitos inferiores intactos.
+**Disponibilidad:** D3/D6/D8 aprobados; componentes[3.0.0](../../contracts.md), HTTP/DTO2.1.0 intacto. **31/31 tareas aceptadas; G3/G4 verificados** según[checklist](../../tasks.md). API/cliente18; flujo privado completo hasta campeón/corrección final con grupos cerrados, guard dirty/pending y recuperación sin autoPUT. Ensayo/carrera PostgreSQL completados solo en entorno descartable; aplicación activa y despliegue requieren aprobación separada. [Evidencia/historia](../../verification.md); requisitos inferiores intactos.
 
 ## ADDED Requirements
 
@@ -48,6 +48,15 @@ El sistema MUST permitir crear un evento vacío, identificarlo por nombre y regi
 - **WHEN** el administrador crea un evento con nombre y sin parejas
 - **THEN** el evento aparece como borrador con instrucciones para registrar parejas y generar queda deshabilitado.
 
+#### Scenario: Carga individual o por lote
+- **WHEN** el administrador registra una pareja o agrega varias filas completas y confirma el lote
+- **THEN** la pareja individual sigue disponible y el lote guarda todas las parejas en una sola operación atómica, con una revisión y `registration_order` consecutivo desde1.
+
+#### Scenario: Numeración después de eliminar
+- **GIVEN** se eliminaron todas las parejas de un borrador
+- **WHEN** se registra una nueva pareja
+- **THEN** la interfaz la identifica como pareja #1, sin mostrar el ID de base de datos.
+
 #### Scenario: Cantidades no predefinidas
 - **WHEN** se registran 5, 8, 14 o 17 parejas en borradores separados
 - **THEN** todas se conservan sin un cupo fijo de 8, 14 o 20; la generación depende de zonas y cupos elegidos.
@@ -76,6 +85,16 @@ El sistema MUST permitir una zona con todas las parejas o dos zonas mediante asi
 - **GIVEN** 15 parejas y dos zonas
 - **WHEN** solicita reparto aleatorio en borrador
 - **THEN** el reparto equilibrado produce tamaños 8 y 7, cada pareja aparece una vez, se persiste y se muestra antes de generar; al generar se conserva sin volver a sortear.
+
+#### Scenario: Descartar reparto guardado
+- **GIVEN** existe un reparto manual o aleatorio guardado en un borrador de dos zonas
+- **WHEN** el administrador descarta el reparto
+- **THEN** todas las parejas quedan sin zona asignada y la acción incrementa la revisión del evento.
+
+#### Scenario: Pareja A deseleccionada en la propuesta
+- **GIVEN** una pareja está guardada en A y el administrador la deselecciona sin guardar la propuesta
+- **WHEN** se actualiza la vista previa
+- **THEN** aparece como sin asignar, no como parte de B; al guardar la propuesta, las parejas no seleccionadas quedan asignadas a B.
 
 ### Requirement: AE-05 Cupos según etapa inicial
 

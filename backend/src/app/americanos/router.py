@@ -78,6 +78,13 @@ def add_registration(event_id: PathId, data: dto.RegistrationRequest, session: S
     return service.add_registration(session, event_id, data)
 
 
+@router.post("/{event_id}/registrations/bulk", status_code=201)
+def add_registrations(
+    event_id: PathId, data: dto.BulkRegistrationRequest, session: SessionDep,
+) -> dto.EventDetail:
+    return service.add_registrations(session, event_id, data)
+
+
 @router.patch("/{event_id}/registrations/{registration_id}")
 def update_registration(
     event_id: PathId, registration_id: PathId, data: dto.UpdateRegistrationRequest, session: SessionDep,
@@ -95,6 +102,11 @@ def delete_registration(
 @router.put("/{event_id}/zones")
 def set_zones(event_id: PathId, data: dto.SetZonesRequest, session: SessionDep) -> dto.EventDetail:
     return service.set_zones(session, event_id, data)
+
+
+@router.delete("/{event_id}/zones")
+def clear_zones(event_id: PathId, expected_revision: RevisionQuery, session: SessionDep) -> dto.EventDetail:
+    return service.clear_zones(session, event_id, expected_revision)
 
 
 @router.post("/{event_id}/zones/randomize")
@@ -124,3 +136,34 @@ def save_round(
     event_id: PathId, number: PathId, data: dto.SaveRoundRequest, session: SessionDep,
 ) -> dto.SaveRoundResponse:
     return service.save_round(session, event_id, number, data)
+
+
+@router.get("/{event_id}/qualification")
+def load_qualification(event_id: PathId, session: SessionDep) -> dto.QualificationResponse:
+    return service.load_qualification(session, event_id)
+
+
+@router.put("/{event_id}/tie-resolutions")
+def save_tie_resolutions(
+    event_id: PathId, data: dto.SaveTieResolutionsRequest, session: SessionDep,
+) -> dto.QualificationResponse:
+    return service.save_tie_resolutions(session, event_id, data)
+
+
+@router.post("/{event_id}/confirm-qualifiers")
+def confirm_qualifiers(
+    event_id: PathId, data: dto.ConfirmQualifiersRequest, session: SessionDep,
+) -> dto.ConfirmationResponse:
+    return service.confirm_qualifiers(session, event_id, data)
+
+
+@router.get("/{event_id}/playoffs")
+def load_playoffs(event_id: PathId, session: SessionDep) -> dto.PlayoffsResponse:
+    return service.load_playoffs(session, event_id)
+
+
+@router.put("/{event_id}/playoffs/{node_id}/result")
+def save_knockout(
+    event_id: PathId, node_id: PathId, data: dto.SaveKnockoutRequest, session: SessionDep,
+) -> dto.PlayoffsResponse:
+    return service.save_knockout(session, event_id, node_id, data)

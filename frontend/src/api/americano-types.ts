@@ -1,4 +1,5 @@
-// Contract v2.1.0: openspec/changes/admin-americanos/contracts.md. Type exports only.
+// Component contract v3.0.0; HTTP/DTO unchanged from v2.1.0. Type exports only.
+// Source: openspec/changes/admin-americanos/contracts.md.
 export type AmericanoId = number
 export type EventState = 'draft' | 'groups' | 'review' | 'playoffs' | 'completed'
 export type StartStage = 'quarterfinal' | 'semifinal' | 'final'
@@ -18,6 +19,8 @@ export interface UpdateEventRequest extends RevisionRequest {
   start_stage?: StartStage
 }
 export interface RegistrationRequest extends RevisionRequest { player1_name: string; player2_name: string }
+export interface RegistrationInput { player1_name: string; player2_name: string }
+export interface BulkRegistrationRequest extends RevisionRequest { registrations: RegistrationInput[] }
 export interface UpdateRegistrationRequest extends RevisionRequest {
   player1_name?: string
   player2_name?: string
@@ -262,9 +265,11 @@ export interface AmericanoOperations {
   loadEvent(eventId: AmericanoId): Promise<EventDetail>
   updateEvent(eventId: AmericanoId, request: UpdateEventRequest): Promise<EventDetail>
   addRegistration(eventId: AmericanoId, request: RegistrationRequest): Promise<EventDetail>
+  addRegistrations(eventId: AmericanoId, request: BulkRegistrationRequest): Promise<EventDetail>
   updateRegistration(eventId: AmericanoId, registrationId: AmericanoId, request: UpdateRegistrationRequest): Promise<EventDetail>
   deleteRegistration(eventId: AmericanoId, registrationId: AmericanoId, request: RevisionRequest): Promise<EventDetail>
   setZones(eventId: AmericanoId, request: SetZonesRequest): Promise<EventDetail>
+  clearZones(eventId: AmericanoId, request: RevisionRequest): Promise<EventDetail>
   randomizeZones(eventId: AmericanoId, request: RevisionRequest): Promise<EventDetail>
   generateFixture(eventId: AmericanoId, request: RevisionRequest): Promise<GenerateFixtureResponse>
   loadRound(eventId: AmericanoId, roundNumber: number): Promise<RoundResponse>
@@ -285,10 +290,14 @@ export type AmericanoDraftOperations = Pick<AmericanoOperations,
   'listEvents' | 'createEvent' | 'loadEvent' | 'updateEvent' |
   'addRegistration' | 'updateRegistration' | 'deleteRegistration'>
 export type AmericanoSetupCapabilities = Pick<AmericanoOperations,
-  'setZones' | 'randomizeZones' | 'generateFixture'>
+  'addRegistrations' | 'setZones' | 'clearZones' | 'randomizeZones' | 'generateFixture'>
 export type AmericanoRoundReadOperations = Pick<AmericanoOperations,
   'loadEvent' | 'loadRound' | 'loadStandings'>
 export type AmericanoRoundOperations = AmericanoRoundReadOperations & Pick<AmericanoOperations, 'saveRound'>
+export type AmericanoQualificationOperations = Pick<AmericanoOperations,
+  'loadEvent' | 'loadQualification' | 'saveTieResolutions' | 'confirmQualifiers'>
+export type AmericanoPlayoffsReadOperations = Pick<AmericanoOperations, 'loadEvent' | 'loadPlayoffs'>
+export type AmericanoPlayoffsOperations = AmericanoPlayoffsReadOperations & Pick<AmericanoOperations, 'saveKnockout'>
 export interface AmericanoListPageProps {
   operations: Pick<AmericanoDraftOperations, 'listEvents' | 'createEvent'>
   onNavigate: (target: AmericanoNavigation) => void
@@ -301,6 +310,13 @@ export interface AmericanoSetupPageProps {
   eventId: AmericanoId
 }
 export interface AmericanoEventPageProps extends AmericanoPageProps { eventId: AmericanoId }
+export interface AmericanoQualificationPageProps extends Omit<AmericanoEventPageProps, 'operations'> {
+  operations: AmericanoQualificationOperations
+}
+export interface AmericanoPlayoffsPageProps extends Omit<AmericanoEventPageProps, 'operations'> {
+  operations: AmericanoPlayoffsOperations
+  onDirtyChange: (draft: DirtyNavigationDraft | null) => void
+}
 export interface DirtyNavigationDraft {
   dirty: boolean
   // Live even before a render: write in flight or canonical reconciliation unresolved.
@@ -324,6 +340,7 @@ export interface ScoreRowProps {
   errors: Partial<Record<Side, string>>
   onChange: (matchId: AmericanoId, side: Side, value: ScoreInput) => void
   onAdvance: (matchId: AmericanoId, side: Side) => void
+  onInvalidInput?: () => void
   registerInput: (matchId: AmericanoId, side: Side, element: HTMLInputElement | null) => void
 }
 export interface StandingsDrawerProps {

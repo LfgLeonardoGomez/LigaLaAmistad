@@ -355,7 +355,8 @@ def test_delete_returns_detail_and_next_order_never_collides_with_survivors(amer
     assert response.status_code == 200
     deleted = response.json()
     EventDetail.model_validate(deleted)
-    assert deleted["registrations"] == survivors
+    compact_survivors = [r | {"registration_order": order} for order, r in enumerate(survivors, 1)]
+    assert deleted["registrations"] == compact_survivors
     assert deleted["revision"] == 5 and deleted["registration_count"] == 2
     assert deleted["groups_revision"] == 0
     replay = api.client.delete(
@@ -364,10 +365,9 @@ def test_delete_returns_detail_and_next_order_never_collides_with_survivors(amer
     assert replay.status_code == 404
     assert api.client.get(f"{BASE}/{detail['id']}").json() == deleted
     added = add_registration(api, deleted, first="Nueva")
-    assert added["registrations"][:-1] == survivors
+    assert added["registrations"][:-1] == compact_survivors
     orders = [r["registration_order"] for r in added["registrations"]]
-    assert len(set(orders)) == 3 and orders == sorted(orders)
-    assert orders[-1] == max(r["registration_order"] for r in survivors) + 1
+    assert orders == [1, 2, 3]
 
 
 def test_delete_last_registration_returns_empty_draft_not_204(americano_api):
@@ -382,6 +382,65 @@ def test_delete_last_registration_returns_empty_draft_not_204(americano_api):
     assert deleted["revision"] == 3 and deleted["can_generate"] is False
     assert deleted["zones"] == detail["zones"]
     assert all(issue["code"] == "insufficient_registrations" for issue in deleted["configuration_issues"])
+    added = add_registration(api, deleted)
+    assert added["registrations"][0]["registration_order"] == 1
+
+
+@pytest.mark.parametrize("zone_count", [1, 2])
+def test_bulk_registration_adds_multiple_pairs_in_one_revision(americano_api, zone_count):
+    api = americano_api
+    detail = create_event(api, zone_count=zone_count)
+    payload = {
+        "expected_revision": detail["revision"],
+        "registrations": [
+            {"player1_name": "  Ana ", "player2_name": " Sol  "},
+            {"player1_name": "Eva", "player2_name": "Luz"},
+            {"player1_name": "Mia", "player2_name": "Noe"},
+        ],
+    }
+    response = api.client.post(f"{BASE}/{detail['id']}/registrations/bulk", json=payload)
+    assert response.status_code == 201, response.text
+    updated = response.json()
+    assert updated["revision"] == detail["revision"] + 1
+    assert [r["registration_order"] for r in updated["registrations"]] == [1, 2, 3]
+    assert [(r["player1_name"], r["player2_name"]) for r in updated["registrations"]] == [
+        ("Ana", "Sol"), ("Eva", "Luz"), ("Mia", "Noe"),
+    ]
+    if zone_count == 1:
+        assert all(r["zone_id"] == updated["zones"][0]["id"] for r in updated["registrations"])
+    else:
+        assert all(r["zone_id"] is None for r in updated["registrations"])
+
+
+@pytest.mark.parametrize("assignment", ["manual", "random"])
+def test_clear_zones_unassigns_saved_manual_or_random_distribution(americano_api, assignment):
+    api = americano_api
+    detail = create_event(api, zone_count=2)
+    detail = api.client.post(f"{BASE}/{detail['id']}/registrations/bulk", json={
+        "expected_revision": detail["revision"],
+        "registrations": [
+            {"player1_name": f"P{i}", "player2_name": f"Q{i}"} for i in range(4)
+        ],
+    }).json()
+    if assignment == "manual":
+        response = api.client.put(f"{BASE}/{detail['id']}/zones", json={
+            "expected_revision": detail["revision"], "zone_count": 2,
+            "zone_a_registration_ids": [r["id"] for r in detail["registrations"][:2]],
+        })
+    else:
+        response = api.client.post(f"{BASE}/{detail['id']}/zones/randomize", json={
+            "expected_revision": detail["revision"],
+        })
+    assert response.status_code == 200
+    assigned = response.json()
+    assert all(r["zone_id"] is not None for r in assigned["registrations"])
+    response = api.client.delete(f"{BASE}/{detail['id']}/zones?expected_revision={assigned['revision']}")
+    assert response.status_code == 200, response.text
+    cleared = response.json()
+    assert cleared["revision"] == assigned["revision"] + 1
+    assert all(r["zone_id"] is None for r in cleared["registrations"])
+    assert cleared["can_generate"] is False
+    assert "unassigned_registrations" in {issue["code"] for issue in cleared["configuration_issues"]}
 
 
 @pytest.mark.parametrize("method", ["POST", "PATCH", "DELETE"])
@@ -464,7 +523,7 @@ def test_delete_requires_positive_integer_revision_in_query(americano_api, query
     assert api.client.get(f"{BASE}/{detail['id']}").json() == detail
 
 
-@pytest.mark.parametrize("operation", ["create", "update", "add", "rename", "delete", "zones", "randomize"])
+@pytest.mark.parametrize("operation", ["create", "update", "add", "bulk", "rename", "delete", "zones", "randomize", "clear"])
 def test_each_mutation_commits_once_and_locks_event_before_children(americano_api, operation):
     # SQL compilation verifies lock intent only; SQLite cannot prove row locking.
     from sqlalchemy.dialects import postgresql
@@ -486,7 +545,7 @@ def test_each_mutation_commits_once_and_locks_event_before_children(americano_ap
     finally:
         sql_event.remove(api.engine, "commit", committed)
         sql_event.remove(api.engine, "before_execute", executed)
-    assert response.status_code == (201 if operation in {"create", "add"} else 200)
+    assert response.status_code == (201 if operation in {"create", "add", "bulk"} else 200)
     assert commits == ["commit"]
     assert response.json()["revision"] == (1 if operation == "create" else 3)
     assert response.json()["groups_revision"] == 0
@@ -496,7 +555,7 @@ def test_each_mutation_commits_once_and_locks_event_before_children(americano_ap
     assert all("FOR SHARE" not in statement for statement in statements)
 
 
-@pytest.mark.parametrize("operation", ["create", "update", "add", "rename", "delete", "zones", "randomize"])
+@pytest.mark.parametrize("operation", ["create", "update", "add", "bulk", "rename", "delete", "zones", "randomize", "clear"])
 def test_commit_failure_rolls_back_all_rows_and_revision(americano_api, operation):
     api = americano_api
     detail = add_registration(api, create_event(api, zone_count=2))
@@ -525,11 +584,18 @@ def _mutate(api, operation, detail):
         return api.client.post(BASE, json={"name": "Nuevo", "zone_count": 2, "start_stage": "final"})
     if operation == "update":
         return api.client.patch(path, json={"expected_revision": revision, "name": "Nuevo", "zone_count": 1})
+    if operation == "clear":
+        return api.client.delete(path + f"/zones?expected_revision={revision}")
     if operation in {"zones", "randomize"}:
         return _assign_zones(api, operation, detail)
     path += "/registrations"
     if operation == "add":
         return api.client.post(path, json={"expected_revision": revision, "player1_name": "Eva", "player2_name": "Luz"})
+    if operation == "bulk":
+        return api.client.post(path + "/bulk", json={"expected_revision": revision, "registrations": [
+            {"player1_name": "Eva", "player2_name": "Luz"},
+            {"player1_name": "Ana", "player2_name": "Sol"},
+        ]})
     path += f"/{detail['registrations'][0]['id']}"
     if operation == "rename":
         return api.client.patch(path, json={"expected_revision": revision, "player2_name": "Luz"})
@@ -573,7 +639,7 @@ def test_path_ids_are_positive_safe_integers_before_database_access(americano_ap
     assert response.json()["fields"][0]["path"] == ["event_id"]
 
 
-@pytest.mark.parametrize("operation", ["update", "add", "rename", "delete"])
+@pytest.mark.parametrize("operation", ["update", "add", "bulk", "rename", "delete", "clear"])
 def test_mutations_of_missing_event_return_flat_404(americano_api, operation):
     detail = {"id": 999, "revision": 1, "registrations": [{"id": 999}]}
     response = _mutate(americano_api, operation, detail)
@@ -703,6 +769,8 @@ def test_random_zones_reject_single_zone_without_mutating_draft(americano_api, s
 
 def _assign_zones(api, operation, detail, **changes):
     payload = {"expected_revision": detail["revision"]}
+    if operation == "clear":
+        return api.client.delete(f"{BASE}/{detail['id']}/zones?expected_revision={changes.get('expected_revision', payload['expected_revision'])}")
     if operation == "randomize":
         return api.client.post(f"{BASE}/{detail['id']}/zones/randomize", json=payload | changes)
     payload |= {
@@ -848,7 +916,7 @@ def test_random_zones_balance_empty_even_odd_and_singleton_inputs(americano_api,
     assert shuffled == [size]
 
 
-@pytest.mark.parametrize("operation", ["zones", "randomize"])
+@pytest.mark.parametrize("operation", ["zones", "randomize", "clear"])
 @pytest.mark.parametrize("state", ["groups", "review", "playoffs", "completed"])
 def test_zone_mutations_are_frozen_in_every_non_draft_state(americano_api, operation, state):
     api = americano_api
@@ -869,7 +937,7 @@ def test_zone_mutations_are_frozen_in_every_non_draft_state(americano_api, opera
     assert api.client.get(f"{BASE}/{detail['id']}").json() == before
 
 
-@pytest.mark.parametrize("operation", ["zones", "randomize"])
+@pytest.mark.parametrize("operation", ["zones", "randomize", "clear"])
 @pytest.mark.parametrize("revision_offset", [-1, 1])
 def test_zone_mutations_reject_stale_or_future_revisions(americano_api, operation, revision_offset):
     api = americano_api
@@ -882,7 +950,7 @@ def test_zone_mutations_reject_stale_or_future_revisions(americano_api, operatio
     assert api.client.get(f"{BASE}/{detail['id']}").json() == detail
 
 
-@pytest.mark.parametrize("operation", ["zones", "randomize"])
+@pytest.mark.parametrize("operation", ["zones", "randomize", "clear"])
 def test_zone_mutations_of_missing_event_are_flat_404(americano_api, operation):
     response = _assign_zones(americano_api, operation, {"id": 99999, "revision": 1,
                                                         "zone_count": 2, "registrations": []})

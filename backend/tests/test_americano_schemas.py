@@ -31,6 +31,10 @@ REQUESTS = [
     ("CreateEventRequest", {"name": "Copa", "zone_count": 1, "start_stage": "final"}),
     ("UpdateEventRequest", {"expected_revision": 3, "zone_count": 2}),
     ("RegistrationRequest", {"expected_revision": 4, "player1_name": "Ana", "player2_name": "Ana"}),
+    ("BulkRegistrationRequest", {"expected_revision": 4, "registrations": [
+        {"player1_name": "Ana", "player2_name": "Sol"},
+        {"player1_name": "Eva", "player2_name": "Luz"},
+    ]}),
     ("UpdateRegistrationRequest", {"expected_revision": 5, "player2_name": "Luz"}),
     ("SetZonesRequest", {"expected_revision": 6, "zone_count": 2, "zone_a_registration_ids": [1, 3]}),
     ("SaveRoundRequest", {"expected_revision": 7, "results": [
@@ -64,6 +68,22 @@ def test_each_request_is_closed(model_name, payload):
 def test_expected_revision_is_a_required_strict_positive_integer(bad):
     with pytest.raises(ValidationError):
         schemas.RevisionRequest(expected_revision=bad)
+
+
+def test_bulk_registration_requires_at_least_two_complete_pairs():
+    with pytest.raises(ValidationError):
+        schemas.BulkRegistrationRequest.model_validate({
+            "expected_revision": 1,
+            "registrations": [{"player1_name": "Ana", "player2_name": "Sol"}],
+        })
+    with pytest.raises(ValidationError):
+        schemas.BulkRegistrationRequest.model_validate({
+            "expected_revision": 1,
+            "registrations": [
+                {"player1_name": "Ana", "player2_name": "Sol"},
+                {"player1_name": "Eva", "player2_name": " "},
+            ],
+        })
 
 
 def test_expected_revision_cannot_be_omitted():

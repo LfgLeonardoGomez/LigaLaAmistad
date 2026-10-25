@@ -110,6 +110,7 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange,
   const [standingsError, setStandingsError] = useState<string | null>(null)
   const [pendingNavigation, setPendingNavigation] = useState<AmericanoNavigation | null>(null)
   const inputs = useRef(new Map<string, HTMLInputElement>())
+  const form = useRef<HTMLFormElement>(null)
   const drawerButton = useRef<HTMLButtonElement>(null)
   const drawerReturnFocus = useRef<HTMLElement | null>(null)
   const tableRequest = useRef(0)
@@ -306,6 +307,7 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange,
     const index = matches.findIndex(match => match.id === matchId)
     const next = side === 'a' ? `${matchId}:b` : matches[index + 1] ? `${matches[index + 1]!.id}:a` : null
     if (next) inputs.current.get(next)?.focus()
+    else form.current?.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus()
   }
 
   function requestNavigation(target: AmericanoNavigation) {
@@ -322,7 +324,10 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange,
     if (!canAct()) return
     const revision = modeRevision.current
     const saved = await persist()
-    if (canAct() && revision === modeRevision.current && saved?.state === 'review' && saved.number === saved.total_rounds) onNavigate({ kind: 'qualification', event_id: saved.event_id })
+    if (!canAct() || revision !== modeRevision.current || !saved) return
+    if (saved.state === 'review' && saved.number === saved.total_rounds) onNavigate({ kind: 'qualification', event_id: saved.event_id })
+    else if (saved.number < saved.total_rounds && saved.max_unlocked_round > saved.number)
+      onNavigate({ kind: 'round', event_id: saved.event_id, round_number: saved.number + 1 })
   }
 
   function captureDrawerFocus() {
@@ -336,7 +341,7 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange,
         : draft.dirty || !round.saved ? 'Sin guardar' : 'Guardada'
   const resultsNotice = consultation
     ? groupsClosed ? 'Los resultados de grupos ya no se pueden modificar.' : 'Consulta de resultados guardados. La carga de resultados todavía no está disponible.'
-    : notice || (readOnly ? 'Los resultados de grupos ya no se pueden modificar.' : 'Completá los games y guardá toda la ronda. El último campo no guarda automáticamente.')
+    : notice || (readOnly ? 'Los resultados de grupos ya no se pueden modificar.' : 'Completá los games y guardá toda la ronda.')
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-5 border-b border-ink-200 pb-5">
@@ -350,6 +355,8 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange,
             onClick={() => requestNavigation({ kind: 'round', event_id: round.event_id, round_number: round.number - 1 })}>Anterior</Button>
           <Button type="button" variant="secondary" disabled={(!consultation && saving) || round.number >= round.total_rounds || round.number >= round.max_unlocked_round}
             onClick={() => requestNavigation({ kind: 'round', event_id: round.event_id, round_number: round.number + 1 })}>Siguiente</Button>
+          {round.state === 'playoffs' || round.state === 'completed' ? <Button type="button" variant="secondary" disabled={!consultation && saving}
+            onClick={() => requestNavigation({ kind: 'playoffs', event_id: round.event_id })}>Volver a playoffs</Button> : null}
           <button ref={drawerButton} type="button" onPointerDown={captureDrawerFocus}
             onClick={() => {
               if (!drawerReturnFocus.current?.isConnected) captureDrawerFocus()
@@ -360,11 +367,8 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange,
         </div>
       </header>
 
-      <form onSubmit={event => { event.preventDefault(); void saveFromForm() }} className="space-y-5" aria-label="Resultados de la ronda">
+      <form ref={form} onSubmit={event => { event.preventDefault(); void saveFromForm() }} className="space-y-5" aria-label="Resultados de la ronda">
         <Card className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-ink-200 bg-ink-50 px-5 py-3 text-xs font-medium uppercase tracking-wide text-ink-500">
-            <span>Partidos de esta ronda · {matches.length}/6</span><span>Games · 0 a 9</span>
-          </div>
           <div className="divide-y divide-ink-200">
             {matches.map(match => {
               const row = draft.rows.find(value => value.match_id === match.id)
@@ -375,7 +379,7 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange,
                   <p className="px-5 pt-3 text-xs font-semibold text-ink-500">Zona {zone.label} <span className="ml-2 font-normal">· Partido {match.display_order}</span></p>
                   <ScoreRow match={match} zoneLabel={zone.label} value={row} readOnly={readOnly || saving} errors={draft.errors[match.id] ?? {}}
                     onChange={(matchId, side, value) => { if (!canAct() || readOnly || busy.current) return; draft.setScore(matchId, side, value); setNotice('') }}
-                    onAdvance={advance} registerInput={registerInput} />
+                    onAdvance={advance} onInvalidInput={() => { setSaveError(null); setNotice('Ingresá un solo dígito (0–9).') }} registerInput={registerInput} />
                 </fieldset>
               ) : null
             })}

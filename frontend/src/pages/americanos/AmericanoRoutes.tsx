@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
-import { americanoDraftOperations, americanoRoundOperations, americanoSetupOperations } from '../../api/americanos'
+import {
+  americanoDraftOperations, americanoPlayoffsOperations, americanoQualificationOperations,
+  americanoRoundOperations, americanoSetupOperations,
+} from '../../api/americanos'
 import type { AmericanoNavigation, AmericanoRoundPageProps, EventDetail } from '../../api/americano-types'
 import { Alert, Button, Spinner } from '../../components/ui'
 import { AmericanosPage } from './AmericanosPage'
 import { AmericanoRoundPage } from './AmericanoRoundPage'
 import { AmericanoSetupPage } from './AmericanoSetupPage'
+import { AmericanoQualificationPage } from './AmericanoQualificationPage'
+import { AmericanoPlayoffsPage } from './AmericanoPlayoffsPage'
+import { useDirtyNavigation } from './useDirtyNavigation'
 
 function positiveId(value: string | undefined): number | null {
   if (!value || !/^[1-9]\d*$/.test(value)) return null
@@ -70,8 +76,6 @@ function continuationPath(event: EventDetail): string {
   }
 }
 
-type PendingStage = 'qualification' | 'playoffs'
-
 export function AmericanoEventRoute() {
   const { eventId } = useParams<'eventId'>()
   const id = positiveId(eventId)
@@ -79,16 +83,19 @@ export function AmericanoEventRoute() {
   return <EventContinuation key={id} eventId={id} />
 }
 
-export function AmericanoPendingRoute({ stage }: { stage: PendingStage }) {
+export function AmericanoStageRoute({ stage }: { stage: 'qualification' | 'playoffs' }) {
   const { eventId } = useParams<'eventId'>()
   const id = positiveId(eventId)
+  const onNavigate = useAmericanoNavigation()
+  const onDirtyChange = useDirtyNavigation()
   if (id === null) return <AmericanoUnavailableRoute />
-  return <EventContinuation key={`${id}:${stage}`} eventId={id} pendingStage={stage} />
+  return stage === 'qualification'
+    ? <AmericanoQualificationPage key={`${id}:qualification`} eventId={id} operations={americanoQualificationOperations} onNavigate={onNavigate} />
+    : <AmericanoPlayoffsPage key={`${id}:playoffs`} eventId={id} operations={americanoPlayoffsOperations} onNavigate={onNavigate} onDirtyChange={onDirtyChange} />
 }
 
-function EventContinuation({ eventId, pendingStage, blockedRoundNumber }: {
+function EventContinuation({ eventId, blockedRoundNumber }: {
   eventId: number
-  pendingStage?: PendingStage
   blockedRoundNumber?: number
 }) {
   const [event, setEvent] = useState<EventDetail | null>(null)
@@ -122,27 +129,16 @@ function EventContinuation({ eventId, pendingStage, blockedRoundNumber }: {
     <EventRouteActions eventId={eventId} />
   </div>
   if (!event || !path) return <Spinner label="Consultando evento…" />
-  const pendingHere = pendingStage === 'qualification' ? event.state === 'review' :
-    pendingStage === 'playoffs' && (event.state === 'playoffs' || event.state === 'completed')
-  if (!pendingHere) return <Navigate to={path} replace />
-  return <div className="space-y-4">
-    <h1 className="text-xl font-semibold text-ink-900">{pendingStage === 'qualification' ? 'Clasificados pendientes de implementación' : 'Playoffs pendientes de implementación'}</h1>
-    <p className="text-sm text-ink-600">{event.name}. Esta etapa todavía no está disponible. Podés consultar la configuración y las rondas guardadas.</p>
-    <EventRouteActions eventId={eventId} consultRound={isPositiveInteger(event.total_rounds) && event.max_unlocked_round === event.total_rounds ? event.total_rounds : undefined} />
-  </div>
+  return <Navigate to={path} replace />
 }
 
-function EventRouteActions({ eventId, consultRound }: { eventId: number; consultRound?: number }) {
+function EventRouteActions({ eventId }: { eventId: number }) {
   const navigate = useNavigate()
   return <div className="flex flex-wrap gap-2">
     <Button type="button" variant="secondary" onClick={() => void navigate(`/admin/americanos/${eventId}/configuracion`)}>Ver configuración</Button>
-    {consultRound ? <Button type="button" variant="secondary" onClick={() => void navigate(`/admin/americanos/${eventId}/rondas/${consultRound}`)}>Consultar última ronda guardada</Button> : null}
     <Button type="button" variant="secondary" onClick={() => void navigate('/admin/americanos')}>Volver a Americanos</Button>
   </div>
 }
-
-// Consultation publishes no draft; this callback does not install a navigation guard.
-const onConsultationDirtyChange: AmericanoRoundPageProps['onDirtyChange'] = () => {}
 
 export function AmericanoRoundRoute() {
   const { eventId, roundNumber } = useParams<'eventId' | 'roundNumber'>()
@@ -150,11 +146,12 @@ export function AmericanoRoundRoute() {
   const number = positiveId(roundNumber)
   if (id === null) return <AmericanoUnavailableRoute />
   if (number === null) return <EventContinuation key={id} eventId={id} />
-  return <ConsultationRound key={`${id}:${number}`} eventId={id} roundNumber={number} />
+  return <RoundRouteView key={`${id}:${number}`} eventId={id} roundNumber={number} />
 }
 
-function ConsultationRound({ eventId, roundNumber }: { eventId: number; roundNumber: number }) {
+function RoundRouteView({ eventId, roundNumber }: { eventId: number; roundNumber: number }) {
   const navigate = useNavigate()
+  const onDirtyChange: AmericanoRoundPageProps['onDirtyChange'] = useDirtyNavigation()
   const [resolving, setResolving] = useState(false)
   const onNavigate = useCallback((target: AmericanoNavigation) => {
     const path = navigationPath(target)
@@ -167,7 +164,7 @@ function ConsultationRound({ eventId, roundNumber }: { eventId: number; roundNum
   }, [eventId, roundNumber, navigate])
   if (resolving) return <EventContinuation eventId={eventId} blockedRoundNumber={roundNumber} />
   return <AmericanoRoundPage eventId={eventId} roundNumber={roundNumber} operations={americanoRoundOperations}
-    mode="consultation" onNavigate={onNavigate} onDirtyChange={onConsultationDirtyChange} />
+    mode="editable" onNavigate={onNavigate} onDirtyChange={onDirtyChange} />
 }
 
 export function AmericanoUnavailableRoute() {

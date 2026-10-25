@@ -20,6 +20,7 @@ def create_db_and_tables() -> None:
     The imports are local and unused on purpose: importing a model module is what
     registers its table in SQLModel.metadata. Without them, tables are missing.
     """
+    from app.americanos import models as americano_models  # noqa: F401
     from app.auth import models as auth_models  # noqa: F401
     from app.matches import models as match_models  # noqa: F401
     from app.playoffs import models as playoff_models  # noqa: F401

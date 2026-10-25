@@ -1,20 +1,28 @@
 """Private Americano operations; one event lock and one transaction per request."""
 
 from contextlib import contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from random import shuffle
 
 from sqlmodel import Session, select
 
 from app.americanos import schemas as dto
-from app.americanos.fixture import FixtureRound, ZoneInput, build_fixture
-from app.americanos.models import (
-    AmericanoEvent, AmericanoEventState, AmericanoGroupMatch, AmericanoRegistration, AmericanoRound,
-    AmericanoStage, AmericanoTieResolution, AmericanoZone, AmericanoZoneLabel,
+from app.americanos.bracket import (
+    APPROVED_CORRECTION_POLICY, APPROVED_SET_CONVENTION, BracketChange, FullSetScore,
+    NodeRef, OpeningPair, SeedSource, SeedingTemplate, bracket_layout, build_bracket,
+    propagate_winner, validate_full_set,
 )
-from app.americanos.qualification import qualification_quotas
-from app.americanos.standings import SavedScore, StandingRegistration, calculate_standings
+from app.americanos.fixture import AmericanoDomainError, FixtureRound, ZoneInput, build_fixture
+from app.americanos.models import (
+    AmericanoEvent, AmericanoEventState, AmericanoGroupMatch, AmericanoKnockoutMatch, AmericanoQualifierSnapshot,
+    AmericanoRegistration, AmericanoRound,
+    AmericanoSide, AmericanoStage, AmericanoTieResolution, AmericanoZone, AmericanoZoneLabel,
+)
+from app.americanos.qualification import ResolvedSeed, SeedRef, TieResolution, qualification_preview, qualification_quotas
+from app.americanos.standings import (
+    SavedScore, StandingBlock, StandingRegistration, StandingRow, ZoneStanding, calculate_standings,
+)
 
 
 class AmericanoError(Exception):
@@ -231,14 +239,56 @@ def add_registration(session: Session, event_id: int, data: dto.RegistrationRequ
     with _transaction(session, write=True):
         event = _event(session, event_id, write=True)
         _validate_draft(event, data.expected_revision)
-        registrations = _registrations(session, event.id)
+        registrations = _compact_registration_orders(session, event.id)
         zone_id = _zones(session, event.id)[0].id if event.zone_count == 1 else None
         session.add(AmericanoRegistration(
             event_id=event.id, zone_id=zone_id,
             player1_name=data.player1_name, player2_name=data.player2_name,
-            registration_order=max((r.registration_order for r in registrations), default=0) + 1,
+            registration_order=len(registrations) + 1,
         ))
         return _changed_detail(session, event)
+
+
+def add_registrations(
+    session: Session, event_id: int, data: dto.BulkRegistrationRequest,
+) -> dto.EventDetail:
+    with _transaction(session, write=True):
+        event = _event(session, event_id, write=True)
+        _validate_draft(event, data.expected_revision)
+        registrations = _compact_registration_orders(session, event.id)
+        zone_id = _zones(session, event.id)[0].id if event.zone_count == 1 else None
+        first_order = len(registrations) + 1
+        session.add_all([
+            AmericanoRegistration(
+                event_id=event.id,
+                zone_id=zone_id,
+                player1_name=pair.player1_name,
+                player2_name=pair.player2_name,
+                registration_order=first_order + offset,
+            )
+            for offset, pair in enumerate(data.registrations)
+        ])
+        return _changed_detail(session, event)
+
+
+def _compact_registration_orders(session: Session, event_id: int) -> list[AmericanoRegistration]:
+    registrations = _registrations(session, event_id)
+    if all(registration.registration_order == order for order, registration in enumerate(registrations, 1)):
+        return registrations
+
+    # Stage above the current range so the immediate UNIQUE constraint cannot
+    # collide while gaps are compacted after deletions or older drafts.
+    last_order = max((registration.registration_order for registration in registrations), default=0)
+    for offset, registration in enumerate(registrations, 1):
+        registration.registration_order = last_order + offset
+        session.add(registration)
+    session.flush()
+
+    for order, registration in enumerate(registrations, 1):
+        registration.registration_order = order
+        session.add(registration)
+    session.flush()
+    return registrations
 
 
 def _draft_registration(
@@ -275,6 +325,8 @@ def delete_registration(
     with _transaction(session, write=True):
         event, registration = _draft_registration(session, event_id, registration_id, expected_revision)
         session.delete(registration)
+        session.flush()
+        _compact_registration_orders(session, event.id)
         return _changed_detail(session, event)
 
 
@@ -316,6 +368,20 @@ def randomize_zones(session: Session, event_id: int, data: dto.RevisionRequest) 
         split = (len(registrations) + 1) // 2
         for index, registration in enumerate(registrations):
             registration.zone_id = zones[0].id if index < split else zones[1].id
+            session.add(registration)
+        return _changed_detail(session, event)
+
+
+def clear_zones(session: Session, event_id: int, expected_revision: int) -> dto.EventDetail:
+    with _transaction(session, write=True):
+        event = _event(session, event_id, write=True)
+        _validate_draft(event, expected_revision)
+        if event.zone_count != 2:
+            raise AmericanoError(
+                422, "invalid_configuration", "Solo se puede limpiar el reparto cuando hay dos zonas.",
+            )
+        for registration in _registrations(session, event.id):
+            registration.zone_id = None
             session.add(registration)
         return _changed_detail(session, event)
 
@@ -469,6 +535,452 @@ def _standings_detail(session: Session, event: AmericanoEvent) -> dto.StandingsR
 def load_standings(session: Session, event_id: int) -> dto.StandingsResponse:
     with _transaction(session):
         return _standings_detail(session, _event(session, event_id))
+
+
+def _seeding_template(detail: dto.EventDetail) -> SeedingTemplate:
+    """Apply the six approved D6 templates, using label order and real zone IDs."""
+    a = detail.zones[0].id
+    if detail.zone_count == 1:
+        positions = {
+            "quarterfinal": [(1, 8), (4, 5), (2, 7), (3, 6)],
+            "semifinal": [(1, 4), (2, 3)], "final": [(1, 2)],
+        }[detail.start_stage]
+        pairs = [(SeedRef(a, first), SeedRef(a, second)) for first, second in positions]
+        suffix = "one-zone"
+    else:
+        b = detail.zones[1].id
+        pairs = {
+            "quarterfinal": [
+                (SeedRef(a, 1), SeedRef(b, 4)), (SeedRef(b, 2), SeedRef(a, 3)),
+                (SeedRef(b, 1), SeedRef(a, 4)), (SeedRef(a, 2), SeedRef(b, 3)),
+            ],
+            "semifinal": [(SeedRef(a, 1), SeedRef(b, 2)), (SeedRef(b, 1), SeedRef(a, 2))],
+            "final": [(SeedRef(a, 1), SeedRef(b, 1))],
+        }[detail.start_stage]
+        suffix = "two-zones"
+    return SeedingTemplate(
+        f"{detail.start_stage}-{suffix}-v1", "approved", detail.start_stage, detail.zone_count,
+        tuple(OpeningPair(first, second) for first, second in pairs),
+    )
+
+
+def _qualification_detail(
+    session: Session, event: AmericanoEvent, resolutions: list[dto.TieResolution] | None = None,
+) -> dto.QualificationResponse:
+    """Compose a preview under the caller's event lock; never create bracket rows."""
+    detail = _detail(session, event)
+    standings = _standings_detail(session, event)
+    template = _seeding_template(detail)
+    frozen = standings.frozen
+    blockers = []
+    if (event.state == AmericanoEventState.DRAFT or detail.saved_rounds != detail.total_rounds
+            or session.exec(select(AmericanoGroupMatch.id).where(
+                AmericanoGroupMatch.event_id == event.id,
+                (AmericanoGroupMatch.games_a.is_(None) | AmericanoGroupMatch.games_b.is_(None)),
+            )).first() is not None):
+        blockers.append(dto.QualificationBlocker(
+            code="groups_incomplete", message="Faltan resultados de grupos guardados.",
+        ))
+    slots, missing, seeds = [], [], []
+    if detail.configuration_issues:
+        blockers.append(dto.QualificationBlocker(
+            code="configuration_invalid", message="La configuración no permite completar los cupos.",
+        ))
+    else:
+        # The standings DTO is already materialized from complete saved scores only.
+        blocks = [ZoneStanding(zone.zone.id, tuple(StandingBlock(
+            block.position_from, block.position_to, block.points_half_units, block.games_diff,
+            tuple(StandingRow(
+                registration=StandingRegistration(**row.registration.model_dump()),
+                **row.model_dump(exclude={"registration"}),
+            ) for row in block.rows),
+        ) for block in zone.blocks)) for zone in standings.zones]
+        if resolutions is None:
+            resolutions = [dto.TieResolution(
+                zone_id=row.zone_id, position=row.position, registration_id=row.registration_id,
+            ) for row in session.exec(select(AmericanoTieResolution).where(
+                AmericanoTieResolution.event_id == event.id,
+                AmericanoTieResolution.source_groups_revision == event.groups_revision,
+            )).all()] if not frozen else []
+        try:
+            preview = qualification_preview(
+                blocks, qualification_quotas(detail.start_stage, [zone.id for zone in detail.zones]),
+                [TieResolution(**resolution.model_dump()) for resolution in resolutions],
+            )
+        except AmericanoDomainError as exc:
+            raise AmericanoError(422, exc.code, exc.message, fields=[dto.AmericanoFieldError(
+                path=list(exc.path), code=exc.code, message=exc.message,
+            )]) from exc
+        slots = [dto.QualificationSlot(
+            **{**asdict(slot), "candidate_registration_ids": list(slot.candidate_registration_ids)},
+        ) for slot in preview.slots]
+        if frozen:
+            # Closed previews take their selections from the canonical snapshot,
+            # not a surviving manual resolution or the visual standing row order.
+            snapshots = session.exec(select(AmericanoQualifierSnapshot).where(
+                AmericanoQualifierSnapshot.event_id == event.id,
+            ).order_by(AmericanoQualifierSnapshot.zone_id, AmericanoQualifierSnapshot.position)).all()
+            selected = {(row.zone_id, row.position): row.registration_id for row in snapshots}
+            slots = [slot.model_copy(update={
+                "registration_id": selected.get((slot.zone_id, slot.position)),
+            }) for slot in slots]
+        missing = [dto.SeedRef(zone_id=slot.zone_id, position=slot.position)
+                   for slot in slots if slot.registration_id is None]
+        seeds = [dto.ResolvedSeed(
+            zone_id=slot.zone_id, position=slot.position, registration_id=slot.registration_id,
+        ) for slot in slots if slot.registration_id is not None]
+        if missing:
+            blockers.append(dto.QualificationBlocker(
+                code="unresolved_ties", message="Seleccioná las parejas para todas las plazas empatadas relevantes.",
+            ))
+    selected = {(seed.zone_id, seed.position): seed.registration_id for seed in seeds}
+
+    def participant(source):
+        return selected.get((source.zone_id, source.position)) if isinstance(source, SeedSource) else None
+
+    return dto.QualificationResponse(
+        event_id=event.id, state=detail.state, revision=event.revision,
+        source_groups_revision=event.groups_revision, standings=standings.zones,
+        quotas=detail.quotas, slots=slots, missing_slots=missing, resolved_seeds=seeds,
+        seeding_template=dto.SeedingTemplate(**asdict(template) | {
+            "opening_pairs": [dto.OpeningPair(**asdict(pair)) for pair in template.opening_pairs],
+        }),
+        bracket=[dto.BracketPreviewNode(
+            stage=node.stage, slot=node.slot, source_a=asdict(node.source_a), source_b=asdict(node.source_b),
+            registration_a_id=participant(node.source_a), registration_b_id=participant(node.source_b),
+            next=asdict(node.next) if node.next else None,
+        ) for node in bracket_layout(detail.start_stage, template)],
+        blockers=blockers, can_confirm=event.state == AmericanoEventState.REVIEW and not blockers,
+        frozen=frozen,
+    )
+
+
+def load_qualification(session: Session, event_id: int) -> dto.QualificationResponse:
+    with _transaction(session):
+        return _qualification_detail(session, _event(session, event_id))
+
+
+def save_tie_resolutions(
+    session: Session, event_id: int, data: dto.SaveTieResolutionsRequest,
+) -> dto.QualificationResponse:
+    with _transaction(session, write=True):
+        event = _event(session, event_id, write=True)
+        _validate_revision(event, data.expected_revision)
+        if event.state != AmericanoEventState.REVIEW:
+            raise AmericanoError(
+                409, "state_conflict", "Los desempates solo pueden resolverse en revisión de grupos.",
+                current_revision=event.revision,
+            )
+        if event.groups_revision != data.source_groups_revision:
+            raise AmericanoError(
+                409, "groups_revision_conflict", "Los resultados cambiaron; recargá la clasificación.",
+                current_revision=event.revision, fields=[dto.AmericanoFieldError(
+                    path=["source_groups_revision"], code="stale", message="Revisión de grupos obsoleta.",
+                )],
+            )
+        preview = _qualification_detail(session, event, data.resolutions)
+        if any(blocker.code == "groups_incomplete" for blocker in preview.blockers):
+            raise AmericanoError(
+                409, "state_conflict", "Faltan resultados de grupos guardados.", current_revision=event.revision,
+            )
+        if any(blocker.code == "configuration_invalid" for blocker in preview.blockers):
+            raise AmericanoError(422, "invalid_configuration", "La configuración no permite completar los cupos.")
+        if preview.missing_slots:
+            raise AmericanoError(
+                422, "invalid_tie_resolution", "Enviá todas las plazas empatadas relevantes.",
+                fields=[dto.AmericanoFieldError(
+                    path=["resolutions"], code="incomplete", message="Faltan plazas por resolver.",
+                )],
+            )
+        for row in session.exec(select(AmericanoTieResolution).where(
+            AmericanoTieResolution.event_id == event.id,
+        )).all():
+            session.delete(row)
+        # Release unique seed/registration keys before inserting replacements;
+        # swapping selected pairs must not depend on ORM flush ordering.
+        session.flush()
+        for resolution in data.resolutions:
+            session.add(AmericanoTieResolution(
+                event_id=event.id, source_groups_revision=event.groups_revision,
+                **resolution.model_dump(),
+            ))
+        event.revision += 1
+        session.add(event)
+        session.flush()
+        return preview.model_copy(update={"revision": event.revision})
+
+
+def _validate_complete_groups(session: Session, event: AmericanoEvent, detail: dto.EventDetail) -> None:
+    """Check the complete persisted fixture, not merely the rows still present."""
+    fixture = build_fixture([
+        ZoneInput(zone.id, zone.label, tuple(
+            registration.id for registration in detail.registrations if registration.zone_id == zone.id
+        )) for zone in detail.zones
+    ])
+    rounds = session.exec(select(AmericanoRound).where(
+        AmericanoRound.event_id == event.id,
+    ).execution_options(populate_existing=True)).all()
+    matches = session.exec(select(AmericanoGroupMatch).where(
+        AmericanoGroupMatch.event_id == event.id,
+    ).execution_options(populate_existing=True)).all()
+    round_numbers = {round_.id: round_.number for round_ in rounds}
+    expected = {
+        (round_.number, match.zone_id, match.registration_a_id, match.registration_b_id, match.display_order)
+        for round_ in fixture for match in round_.matches
+    }
+    actual = {
+        (round_numbers.get(match.round_id), match.zone_id, match.registration_a_id,
+         match.registration_b_id, match.display_order) for match in matches
+    }
+    if ({round_.number for round_ in rounds} != {round_.number for round_ in fixture}
+            or any(round_.saved_at is None for round_ in rounds) or actual != expected
+            or any(match.games_a is None or match.games_b is None for match in matches)):
+        raise AmericanoError(
+            409, "state_conflict", "Faltan resultados de grupos íntegros y guardados.",
+            current_revision=event.revision,
+        )
+
+
+def _playoffs_detail(session: Session, event: AmericanoEvent) -> dto.PlayoffsResponse:
+    """Read canonical persisted nodes/snapshots inside the caller's event lock."""
+    if event.state not in {AmericanoEventState.PLAYOFFS, AmericanoEventState.COMPLETED}:
+        raise AmericanoError(
+            409, "state_conflict", "Confirmá los clasificados antes de consultar el cuadro.",
+            current_revision=event.revision,
+        )
+    detail = _detail(session, event)
+    registrations = {registration.id: registration for registration in detail.registrations}
+    snapshots = session.exec(select(AmericanoQualifierSnapshot).where(
+        AmericanoQualifierSnapshot.event_id == event.id,
+    ).order_by(AmericanoQualifierSnapshot.zone_id, AmericanoQualifierSnapshot.position)
+        .execution_options(populate_existing=True)).all()
+    nodes = session.exec(select(AmericanoKnockoutMatch).where(
+        AmericanoKnockoutMatch.event_id == event.id,
+    ).execution_options(populate_existing=True)).all()
+    stage_order = {"quarterfinal": 0, "semifinal": 1, "final": 2}
+    nodes = sorted(nodes, key=lambda node: (stage_order[node.stage.value], node.slot))
+    by_id = {node.id: node for node in nodes}
+
+    def edit_block_reason(node: AmericanoKnockoutMatch):
+        if node.registration_a_id is None or node.registration_b_id is None:
+            return "participants_pending"
+        descendant = by_id.get(node.next_match_id)
+        while descendant is not None:
+            if descendant.set_complete or descendant.games_a is not None or descendant.games_b is not None:
+                return "descendant_played"
+            descendant = by_id.get(descendant.next_match_id)
+        return None
+
+    result_nodes = []
+    for node in nodes:
+        reason = edit_block_reason(node)
+        result_nodes.append(dto.KnockoutNode(
+            id=node.id, stage=node.stage.value, slot=node.slot,
+            registration_a=registrations.get(node.registration_a_id),
+            registration_b=registrations.get(node.registration_b_id),
+            games_a=node.games_a, games_b=node.games_b, set_complete=node.set_complete,
+            next_match_id=node.next_match_id, next_side=node.next_side.value if node.next_side else None,
+            winner_registration_id=node.winner_registration_id,
+            can_edit=reason is None, edit_block_reason=reason,
+        ))
+    return dto.PlayoffsResponse(
+        event_id=event.id, event_name=detail.name, state=detail.state,
+        revision=event.revision, groups_revision=event.groups_revision, start_stage=detail.start_stage,
+        zones=detail.zones,
+        snapshots=[dto.QualifierSnapshot(**{
+            field: getattr(snapshot, field) for field in dto.QualifierSnapshot.model_fields
+        }) for snapshot in snapshots],
+        nodes=result_nodes, champion=registrations.get(event.champion_registration_id),
+    )
+
+
+def load_playoffs(session: Session, event_id: int) -> dto.PlayoffsResponse:
+    with _transaction(session):
+        return _playoffs_detail(session, _event(session, event_id))
+
+
+def _canonical_bracket(session: Session, event: AmericanoEvent):
+    """Adapt stored rows using frozen seeds and approved topology, never row IDs as slots."""
+    detail = _detail(session, event)
+    snapshots = session.exec(select(AmericanoQualifierSnapshot).where(
+        AmericanoQualifierSnapshot.event_id == event.id,
+    ).execution_options(populate_existing=True)).all()
+    if any(snapshot.source_groups_revision != event.confirmed_source_revision for snapshot in snapshots):
+        raise AmericanoDomainError("invalid_configuration", "Snapshot source revision is inconsistent.")
+    planned = build_bracket(detail.start_stage, [ResolvedSeed(
+        row.zone_id, row.position, row.registration_id,
+    ) for row in snapshots], _seeding_template(detail))
+    rows = session.exec(select(AmericanoKnockoutMatch).where(
+        AmericanoKnockoutMatch.event_id == event.id,
+    ).execution_options(populate_existing=True)).all()
+    by_ref = {(row.stage.value, row.slot): row for row in rows}
+    if set(by_ref) != {(node.stage, node.slot) for node in planned}:
+        raise AmericanoDomainError("invalid_configuration", "The persisted bracket is incomplete.")
+    nodes = []
+    for node in planned:
+        row = by_ref[node.stage, node.slot]
+        expected_next = by_ref[node.next.stage, node.next.slot].id if node.next else None
+        expected_side = node.next.side if node.next else None
+        if (row.next_match_id != expected_next
+                or (row.next_side.value if row.next_side else None) != expected_side):
+            raise AmericanoDomainError("invalid_configuration", "The persisted bracket destination is inconsistent.")
+        for side in ("a", "b"):
+            if (isinstance(getattr(node, f"source_{side}"), SeedSource)
+                    and getattr(row, f"registration_{side}_id") != getattr(node, f"registration_{side}_id")):
+                raise AmericanoDomainError("invalid_configuration", "Opening participants must match frozen seeds.")
+        nodes.append(replace(
+            node, registration_a_id=row.registration_a_id, registration_b_id=row.registration_b_id,
+            games_a=row.games_a, games_b=row.games_b, set_complete=row.set_complete,
+        ))
+    return nodes, by_ref
+
+
+def save_knockout(
+    session: Session, event_id: int, node_id: int, data: dto.SaveKnockoutRequest,
+) -> dto.PlayoffsResponse:
+    with _transaction(session, write=True):
+        event = _event(session, event_id, write=True)
+        _validate_lookup_integer(node_id)
+        row = session.exec(select(AmericanoKnockoutMatch).where(
+            AmericanoKnockoutMatch.event_id == event.id, AmericanoKnockoutMatch.id == node_id,
+        ).execution_options(populate_existing=True)).first()
+        # A foreign nested ID must not disclose this event's phase/revision.
+        if row is None:
+            raise AmericanoError(404, "not_found", "Evento o recurso no encontrado.")
+        _validate_revision(event, data.expected_revision)
+        if event.state not in {AmericanoEventState.PLAYOFFS, AmericanoEventState.COMPLETED}:
+            raise AmericanoError(
+                409, "state_conflict", "Los resultados eliminatorios requieren clasificados confirmados.",
+                current_revision=event.revision,
+            )
+        try:
+            score = validate_full_set(
+                FullSetScore(data.games_a, data.games_b, data.set_complete), APPROVED_SET_CONVENTION,
+            )
+            nodes, by_ref = _canonical_bracket(session, event)
+            propagated = propagate_winner(nodes, BracketChange(
+                NodeRef(row.stage.value, row.slot), score, APPROVED_CORRECTION_POLICY,
+            ))
+        except AmericanoDomainError as exc:
+            status = 409 if exc.code in {"participants_pending", "descendant_played"} else 422
+            metadata = {"current_revision": event.revision} if status == 409 else {}
+            if exc.path:
+                metadata["fields"] = [dto.AmericanoFieldError(
+                    path=list(exc.path), code=exc.code, message=exc.message,
+                )]
+            raise AmericanoError(status, exc.code, exc.message, **metadata) from exc
+        row.games_a, row.games_b, row.set_complete = score.games_a, score.games_b, True
+        row.winner_registration_id = row.registration_a_id if score.winner_side == "a" else row.registration_b_id
+        session.add(row)
+        session.flush()
+        # The pure result changes only this node and its own next side. Persist
+        # only differing participants: never overwrite a sibling result/side.
+        for node in propagated.nodes:
+            stored = by_ref[node.stage, node.slot]
+            for side in ("a", "b"):
+                field = f"registration_{side}_id"
+                if getattr(stored, field) != getattr(node, field):
+                    setattr(stored, field, getattr(node, field))
+                    session.add(stored)
+        if propagated.champion_registration_id is not None:
+            event.champion_registration_id = propagated.champion_registration_id
+            event.state = AmericanoEventState.COMPLETED
+        event.revision += 1  # identical accepted PUTs advance the global revision too
+        session.add(event)
+        session.flush()
+        return _playoffs_detail(session, event)
+
+
+def _confirmation_detail(session: Session, event: AmericanoEvent) -> dto.ConfirmationResponse:
+    detail = _detail(session, event)
+    return dto.ConfirmationResponse(
+        event=detail, confirmation_key=event.confirmation_key,
+        confirmed_source_revision=event.confirmed_source_revision,
+        confirmed_at=detail.confirmed_at, playoffs=_playoffs_detail(session, event),
+    )
+
+
+def confirm_qualifiers(
+    session: Session, event_id: int, data: dto.ConfirmQualifiersRequest,
+) -> dto.ConfirmationResponse:
+    with _transaction(session, write=True):
+        event = _event(session, event_id, write=True)
+        # The DTO normalizes UUID representations. Replay is deliberately before
+        # revision/state checks and returns the CURRENT canonical bracket.
+        if event.confirmation_key is not None:
+            if event.confirmation_key == data.confirmation_key:
+                return _confirmation_detail(session, event)
+            raise AmericanoError(
+                409, "already_confirmed", "Los clasificados ya fueron confirmados por otra operación.",
+                current_revision=event.revision,
+            )
+        _validate_revision(event, data.expected_revision)
+        if event.state != AmericanoEventState.REVIEW:
+            raise AmericanoError(
+                409, "state_conflict", "Completá todos los grupos antes de confirmar los clasificados.",
+                current_revision=event.revision,
+            )
+        if event.groups_revision != data.source_groups_revision:
+            raise AmericanoError(
+                409, "groups_revision_conflict", "Los resultados cambiaron; recargá la clasificación.",
+                current_revision=event.revision, fields=[dto.AmericanoFieldError(
+                    path=["source_groups_revision"], code="stale", message="Revisión de grupos obsoleta.",
+                )],
+            )
+        detail = _detail(session, event)
+        if detail.configuration_issues:
+            raise AmericanoError(422, "invalid_configuration", "La configuración no permite completar los cupos.")
+        _validate_complete_groups(session, event, detail)
+        preview = _qualification_detail(session, event)
+        if preview.missing_slots:
+            raise AmericanoError(
+                422, "invalid_tie_resolution", "Resolvé todas las plazas empatadas antes de confirmar.",
+                fields=[dto.AmericanoFieldError(
+                    path=["resolutions"], code="incomplete", message="Faltan plazas por resolver.",
+                )],
+            )
+        template = _seeding_template(detail)
+        if template.status != "approved":
+            raise AmericanoError(
+                409, "decision_pending", "La siembra todavía requiere aprobación.", current_revision=event.revision,
+            )
+        bracket = build_bracket(
+            detail.start_stage, [ResolvedSeed(**seed.model_dump()) for seed in preview.resolved_seeds], template,
+        )
+        standing_rows = {
+            row.registration.id: row for zone in preview.standings for block in zone.blocks for row in block.rows
+        }
+        for seed in preview.resolved_seeds:
+            row = standing_rows[seed.registration_id]
+            session.add(AmericanoQualifierSnapshot(
+                event_id=event.id, **seed.model_dump(),
+                player1_name=row.registration.player1_name, player2_name=row.registration.player2_name,
+                points_half_units=row.points_half_units, games_diff=row.games_diff,
+                source_groups_revision=event.groups_revision,
+            ))
+        session.flush()
+        persisted = {}
+        # Descendants first: immediate FK + CHECK forbid a temporary null
+        # destination on a non-final node, even inside this transaction.
+        for planned in reversed(bracket):
+            node = AmericanoKnockoutMatch(
+                event_id=event.id, stage=AmericanoStage(planned.stage), slot=planned.slot,
+                registration_a_id=planned.registration_a_id, registration_b_id=planned.registration_b_id,
+                next_match_id=persisted[(planned.next.stage, planned.next.slot)].id if planned.next else None,
+                next_side=AmericanoSide(planned.next.side) if planned.next else None,
+            )
+            session.add(node)
+            session.flush()
+            persisted[planned.stage, planned.slot] = node
+        event.confirmation_key = data.confirmation_key
+        event.confirmed_source_revision = event.groups_revision
+        event.confirmed_at = datetime.now(UTC)
+        event.state = AmericanoEventState.PLAYOFFS
+        event.revision += 1
+        session.add(event)
+        session.flush()
+        # DTO validation/materialization belongs to the transaction too.
+        return _confirmation_detail(session, event)
 
 
 def save_round(

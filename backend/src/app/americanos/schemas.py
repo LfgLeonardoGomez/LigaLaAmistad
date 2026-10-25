@@ -108,6 +108,15 @@ class RegistrationRequest(RevisionRequest):
     player2_name: Name
 
 
+class RegistrationInput(ContractModel):
+    player1_name: Name
+    player2_name: Name
+
+
+class BulkRegistrationRequest(RevisionRequest):
+    registrations: list[RegistrationInput] = Field(min_length=2)
+
+
 class UpdateRegistrationRequest(_PatchRequest):
     player1_name: Name | None = None
     player2_name: Name | None = None

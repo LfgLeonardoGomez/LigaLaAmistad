@@ -115,7 +115,9 @@ def test_draft_operations_leave_nonempty_league_and_public_responses_unchanged(a
         {"set_number": number, "team_a_games": 6, "team_b_games": 4} for number in [1, 2]
     ]}).status_code == 200
     paths = ["/public/zones", "/public/teams", "/public/matches",
-             "/public/matches?status=pending", f"/public/standings?zone_id={zone_id}"]
+             "/public/matches?status=pending", f"/public/standings?zone_id={zone_id}",
+             f"/public/teams?zone_id={zone_id}", f"/public/matches?zone_id={zone_id}",
+             f"/public/matches/votes?ids={match_id}"]
 
     def public_snapshot():
         api.authenticate("anonymous")
@@ -157,8 +159,16 @@ def test_draft_operations_leave_nonempty_league_and_public_responses_unchanged(a
         })
         assert response.status_code == 200
         draft = response.json()
-        for _ in range(4):
-            draft = add_registration(api, draft)
+        response = api.client.delete(f"{BASE}/{draft['id']}/zones?expected_revision={draft['revision']}")
+        assert response.status_code == 200
+        draft = response.json()
+        response = api.client.post(f"{BASE}/{draft['id']}/registrations/bulk", json={
+            "expected_revision": draft["revision"], "registrations": [
+                {"player1_name": f"Pareja {index}", "player2_name": "Integridad"} for index in range(4)
+            ],
+        })
+        assert response.status_code == 201
+        draft = response.json()
         response = api.client.put(f"{BASE}/{draft['id']}/zones", json={
             "expected_revision": draft["revision"], "zone_count": 2,
             "zone_a_registration_ids": [r["id"] for r in draft["registrations"][:2]],
@@ -177,6 +187,60 @@ def test_draft_operations_leave_nonempty_league_and_public_responses_unchanged(a
             "results": [{"match_id": match["id"], "games_a": 0, "games_b": 0} for match in round_["matches"]],
         })
         assert response.status_code == 200 and response.json()["round"]["state"] == "review"
+        event_path = f"{BASE}/{draft['id']}"
+        response = api.client.get(event_path + "/qualification")
+        assert response.status_code == 200
+        preview = response.json()
+        assert preview["state"] == "review" and preview["missing_slots"]
+        # Explicit choices from the real tied candidates, standing in for the
+        # organizer's human draw; never manufacture identities or seed by name.
+        selected = set()
+        resolutions = []
+        for slot in preview["slots"]:
+            if not slot["requires_resolution"]:
+                continue
+            registration_id = next(candidate for candidate in reversed(slot["candidate_registration_ids"])
+                                   if candidate not in selected)
+            selected.add(registration_id)
+            resolutions.append({"zone_id": slot["zone_id"], "position": slot["position"],
+                                "registration_id": registration_id})
+        response = api.client.put(event_path + "/tie-resolutions", json={
+            "expected_revision": preview["revision"], "source_groups_revision": preview["source_groups_revision"],
+            "resolutions": resolutions,
+        })
+        assert response.status_code == 200 and response.json()["can_confirm"] is True
+        resolved = response.json()
+        confirmation = {
+            "expected_revision": resolved["revision"], "source_groups_revision": resolved["source_groups_revision"],
+            "confirmation_key": "6c764a9e-ad96-4c73-a468-f89261f3fa08",
+        }
+        response = api.client.post(event_path + "/confirm-qualifiers", json=confirmation)
+        assert response.status_code == 200 and response.json()["event"]["state"] == "playoffs"
+        confirmed = response.json()["playoffs"]
+        response = api.client.get(event_path + "/playoffs")
+        assert response.status_code == 200 and response.json() == confirmed
+        assert len(confirmed["nodes"]) == 1
+        final = confirmed["nodes"][0]
+        result_path = event_path + f"/playoffs/{final['id']}/result"
+        response = api.client.put(result_path, json={
+            "expected_revision": confirmed["revision"], "games_a": 6, "games_b": 0, "set_complete": True,
+        })
+        assert response.status_code == 200
+        completed = response.json()
+        assert completed["state"] == "completed" and completed["champion"]["id"] == final["registration_a"]["id"]
+        response = api.client.put(result_path, json={
+            "expected_revision": completed["revision"], "games_a": 0, "games_b": 6, "set_complete": True,
+        })
+        assert response.status_code == 200
+        corrected = response.json()
+        assert corrected["state"] == "completed" and corrected["champion"]["id"] == final["registration_b"]["id"]
+        assert corrected["snapshots"] == confirmed["snapshots"]
+        assert api.client.get(event_path + "/playoffs").json() == corrected
+        for path in ["/qualification", "/standings"]:
+            response = api.client.get(event_path + path)
+            assert response.status_code == 200 and response.json()["frozen"] is True
+        response = api.client.post(event_path + "/confirm-qualifiers", json=confirmation)
+        assert response.status_code == 200 and response.json()["playoffs"] == corrected
     finally:
         sql_event.remove(api.engine, "before_cursor_execute", executed)
     assert statements and all("americano_" in sql or "admin_users" in sql for sql in statements)
@@ -184,7 +248,7 @@ def test_draft_operations_leave_nonempty_league_and_public_responses_unchanged(a
     assert public_snapshot() == public_before
 
 
-def test_only_the_thirteen_authorized_operations_are_published(americano_api):
+def test_only_the_twenty_authorized_operations_are_published(americano_api):
     from app.main import app
 
     paths = app.openapi()["paths"]
@@ -194,15 +258,57 @@ def test_only_the_thirteen_authorized_operations_are_published(americano_api):
         ("GET", BASE), ("POST", BASE),
         ("GET", BASE + "/{event_id}"), ("PATCH", BASE + "/{event_id}"),
         ("POST", BASE + "/{event_id}/registrations"),
+        ("POST", BASE + "/{event_id}/registrations/bulk"),
         ("PATCH", BASE + "/{event_id}/registrations/{registration_id}"),
         ("DELETE", BASE + "/{event_id}/registrations/{registration_id}"),
         ("PUT", BASE + "/{event_id}/zones"),
+        ("DELETE", BASE + "/{event_id}/zones"),
         ("POST", BASE + "/{event_id}/zones/randomize"),
         ("POST", BASE + "/{event_id}/fixture"),
         ("GET", BASE + "/{event_id}/rounds/{number}"),
         ("GET", BASE + "/{event_id}/standings"),
         ("PUT", BASE + "/{event_id}/rounds/{number}/results"),
+        ("GET", BASE + "/{event_id}/qualification"),
+        ("PUT", BASE + "/{event_id}/tie-resolutions"),
+        ("POST", BASE + "/{event_id}/confirm-qualifiers"),
+        ("GET", BASE + "/{event_id}/playoffs"),
+        ("PUT", BASE + "/{event_id}/playoffs/{node_id}/result"),
     }
+
+
+@pytest.mark.parametrize("mode", ["anonymous", "expired", "inactive"])
+@pytest.mark.parametrize("method,path,payload", [
+    ("GET", "", None),
+    ("POST", "", {"name": "Privado", "zone_count": 1, "start_stage": "final"}),
+    ("GET", "/1", None),
+    ("PATCH", "/1", {"expected_revision": 1, "name": "Privado"}),
+    ("POST", "/1/registrations", {"expected_revision": 1, "player1_name": "A", "player2_name": "B"}),
+    ("POST", "/1/registrations/bulk", {"expected_revision": 1, "registrations": [
+        {"player1_name": "A", "player2_name": "B"}, {"player1_name": "C", "player2_name": "D"},
+    ]}),
+    ("PATCH", "/1/registrations/1", {"expected_revision": 1, "player1_name": "A"}),
+    ("DELETE", "/1/registrations/1?expected_revision=1", None),
+    ("PUT", "/1/zones", {"expected_revision": 1, "zone_count": 1, "zone_a_registration_ids": []}),
+    ("DELETE", "/1/zones?expected_revision=1", None),
+    ("POST", "/1/zones/randomize", {"expected_revision": 1}),
+    ("POST", "/1/fixture", {"expected_revision": 1}),
+    ("GET", "/1/rounds/1", None),
+    ("PUT", "/1/rounds/1/results", {"expected_revision": 1, "results": []}),
+    ("GET", "/1/standings", None),
+    ("GET", "/1/qualification", None),
+    ("PUT", "/1/tie-resolutions", {"expected_revision": 1, "source_groups_revision": 0, "resolutions": []}),
+    ("POST", "/1/confirm-qualifiers", {"expected_revision": 1, "source_groups_revision": 0,
+                                      "confirmation_key": "6c764a9e-ad96-4c73-a468-f89261f3fa08"}),
+    ("GET", "/1/playoffs", None),
+    ("PUT", "/1/playoffs/1/result", {"expected_revision": 1, "games_a": 6, "games_b": 0, "set_complete": True}),
+])
+def test_all_twenty_operations_keep_real_admin_cookie_guard(americano_api, mode, method, path, payload):
+    api = americano_api
+    api.authenticate(mode)
+    response = api.client.request(method, BASE + path, json=payload)
+    assert response.status_code == 401 and response.json() == {"detail": "Not authenticated"}
+    with Session(api.engine) as session:
+        assert session.exec(select(AmericanoEvent)).all() == []
 
 
 @pytest.mark.parametrize("mode", ["anonymous", "expired", "inactive"])

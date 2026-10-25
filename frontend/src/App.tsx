@@ -1,8 +1,9 @@
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { Navigate, Outlet, Route, createRoutesFromElements } from 'react-router-dom'
 
 import { AuthProvider, useAuth } from './auth/AuthContext'
 import { LoginPage } from './auth/LoginPage'
 import { Layout } from './components/Layout'
+import { DirtyNavigationProvider } from './pages/americanos/useDirtyNavigation'
 import { AdminUsersPage } from './pages/AdminUsersPage'
 import { MatchesPage } from './pages/MatchesPage'
 import { PlayoffsPage } from './pages/PlayoffsPage'
@@ -11,7 +12,7 @@ import { SponsorsPage } from './pages/SponsorsPage'
 import { StandingsPage } from './pages/StandingsPage'
 import { TeamsPage } from './pages/TeamsPage'
 import {
-  AmericanoEventRoute, AmericanosListRoute, AmericanoPendingRoute, AmericanoRoundRoute,
+  AmericanoEventRoute, AmericanosListRoute, AmericanoStageRoute, AmericanoRoundRoute,
   AmericanoSetupRoute, AmericanoUnavailableRoute,
 } from './pages/americanos/AmericanoRoutes'
 import { HomePage } from './public/HomePage'
@@ -42,10 +43,8 @@ function RequireAdmin() {
   return <Outlet />
 }
 
-export function App() {
-  return (
-    <ThemeProvider>
-      <Routes>
+export const appRoutes = createRoutesFromElements(
+    <Route element={<ThemeProvider><Outlet /></ThemeProvider>}>
         <Route element={<PublicLayout />}>
           <Route index element={<HomePage />} />
           <Route path="parejas" element={<PublicTeamsPage />} />
@@ -67,7 +66,7 @@ export function App() {
             </AdminThemeProvider>
           }
         >
-          <Route element={<Layout />}>
+          <Route element={<DirtyNavigationProvider><Layout /></DirtyNavigationProvider>}>
             <Route index element={<Navigate to="parejas" replace />} />
             <Route path="parejas" element={<TeamsPage />} />
             <Route path="partidos" element={<MatchesPage />} />
@@ -80,14 +79,12 @@ export function App() {
             <Route path="americanos/:eventId" element={<AmericanoEventRoute />} />
             <Route path="americanos/:eventId/configuracion" element={<AmericanoSetupRoute />} />
             <Route path="americanos/:eventId/rondas/:roundNumber" element={<AmericanoRoundRoute />} />
-            <Route path="americanos/:eventId/clasificados" element={<AmericanoPendingRoute stage="qualification" />} />
-            <Route path="americanos/:eventId/playoffs" element={<AmericanoPendingRoute stage="playoffs" />} />
+            <Route path="americanos/:eventId/clasificados" element={<AmericanoStageRoute stage="qualification" />} />
+            <Route path="americanos/:eventId/playoffs" element={<AmericanoStageRoute stage="playoffs" />} />
             <Route path="americanos/*" element={<AmericanoUnavailableRoute />} />
           </Route>
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </ThemeProvider>
-  )
-}
+    </Route>,
+)

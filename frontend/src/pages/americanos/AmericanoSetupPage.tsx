@@ -12,6 +12,7 @@ interface Recovery {
   useServer: () => void
   keep: () => boolean
 }
+interface PairDraft { key: number; player1: string; player2: string }
 
 export function AmericanoSetupPage(props: AmericanoSetupPageProps) {
   return <SetupLoader key={props.eventId} {...props} />
@@ -165,21 +166,27 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
   const [zoneCount, setZoneCount] = useState(event.zone_count)
   const [stage, setStage] = useState(event.start_stage)
   const [editing, setEditing] = useState<Registration | null>(null)
-  const [player1, setPlayer1] = useState('')
-  const [player2, setPlayer2] = useState('')
+  const pairSequence = useRef(1)
+  const [pairRows, setPairRows] = useState<PairDraft[]>([{ key: 0, player1: '', player2: '' }])
   const zoneA = event.zones.find((zone) => zone.label === 'A')
   const [selected, setSelected] = useState(() => new Set(event.registrations.filter((r) => r.zone_id === zoneA?.id).map((r) => r.id)))
-  const [selectionEdited, setSelectionEdited] = useState(false)
   const frozen = event.state !== 'draft'
   const locked = disabled || frozen
   const configDirty = name !== event.name || zoneCount !== event.zone_count || stage !== event.start_stage
-  const pairDirty = editing !== null || player1 !== '' || player2 !== ''
-  const unassigned = event.registrations.some((r) => r.zone_id === null)
-  const zonesDirty = (selectionEdited && unassigned) || event.registrations.some((r) => selected.has(r.id) !== (r.zone_id === zoneA?.id))
+  const pairDirty = editing !== null || pairRows.length > 1 || pairRows.some((row) => row.player1 !== '' || row.player2 !== '')
+  const zonesDirty = event.registrations.some((r) => selected.has(r.id) !== (r.zone_id === zoneA?.id))
   const revision = { expected_revision: event.revision }
-  const a = event.registrations.filter((r) => event.zone_count === 1 || selected.has(r.id))
   const zoneB = event.zones.find((zone) => zone.label === 'B')
-  const b = event.zone_count === 2 ? event.registrations.filter((r) => zonesDirty ? !selected.has(r.id) : r.zone_id === zoneB?.id) : []
+  const previewZone = (registration: Registration) => {
+    if (event.zone_count !== 2 || !zonesDirty) return registration.zone_id
+    if (selected.has(registration.id)) return zoneA?.id ?? null
+    return registration.zone_id === zoneB?.id ? zoneB.id : null
+  }
+  const a = event.registrations.filter((r) => event.zone_count === 1 || previewZone(r) === zoneA?.id)
+  const b = event.zone_count === 2 ? event.registrations.filter((r) => previewZone(r) === zoneB?.id) : []
+  const savedUnassigned = event.registrations.some((r) => r.zone_id === null)
+  const unassigned = event.zone_count === 2 ? event.registrations.some((r) => previewZone(r) === null) : savedUnassigned
+  const hasSavedDistribution = event.zone_count === 2 && event.registrations.some((r) => r.zone_id !== null)
   const total = { quarterfinal: 8, semifinal: 4, final: 2 }[event.start_stage]
   const required = total / event.zone_count
   const dirty = configDirty || pairDirty || zonesDirty
@@ -203,10 +210,12 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
     if (editing && canonicalPair) setEditing(canonicalPair)
     const canonicalZoneA = canonical.zones.find((zone) => zone.label === 'A')
     setSelected(new Set(canonical.registrations.filter((r) => r.zone_id === canonicalZoneA?.id).map((r) => r.id)))
-    setSelectionEdited(false)
   }
 
-  function resetPair() { setEditing(null); setPlayer1(''); setPlayer2('') }
+  function resetPair() {
+    setEditing(null)
+    setPairRows([{ key: pairSequence.current++, player1: '', player2: '' }])
+  }
   function saveConfiguration(e: FormEvent) {
     e.preventDefault()
     if (locked || !configDirty || !name.trim() || pairDirty || zonesDirty) return
@@ -216,7 +225,6 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
   }
   function toggleZoneA(id: number) {
     if (locked || configDirty || pairDirty || !operations.setZones || !event.registrations.some((r) => r.id === id)) return
-    setSelectionEdited(true)
     setSelected((current) => {
       const next = new Set(current)
       if (next.has(id)) next.delete(id)
@@ -233,9 +241,24 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
   }
   async function savePair(e: FormEvent) {
     e.preventDefault()
-    if (!player1.trim() || !player2.trim() || locked || configDirty || zonesDirty) return
-    const request = { ...revision, player1_name: player1.trim(), player2_name: player2.trim() }
-    await mutate(() => editing ? operations.updateRegistration(event.id, editing.id, request) : operations.addRegistration(event.id, request), editing ? undefined : 'registration-add')
+    const registrations = pairRows.map((row) => ({ player1_name: row.player1.trim(), player2_name: row.player2.trim() }))
+    if (registrations.some((pair) => !pair.player1_name || !pair.player2_name) || locked || configDirty || zonesDirty) return
+    const first = registrations[0]
+    if (!first) return
+    if (editing) {
+      await mutate(() => operations.updateRegistration(event.id, editing.id, { ...revision, ...first }))
+    } else if (registrations.length === 1) {
+      await mutate(() => operations.addRegistration(event.id, { ...revision, ...first }), 'registration-add')
+    } else if (operations.addRegistrations) {
+      await mutate(() => operations.addRegistrations!(event.id, { ...revision, registrations }), 'registration-add')
+    }
+  }
+  function discardZoneEdits() {
+    setSelected(new Set(event.registrations.filter((r) => r.zone_id === zoneA?.id).map((r) => r.id)))
+  }
+  function discardSavedZones() {
+    if (!operations.clearZones || locked || configDirty || pairDirty) return
+    void mutate(() => operations.clearZones!(event.id, revision))
   }
   function generateFixture() {
     const generate = operations.generateFixture
@@ -251,7 +274,7 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
       <p className="text-sm text-ink-700">{canonical.name} · {states[canonical.state]} · {canonical.zone_count === 1 ? 'Una zona' : 'Dos zonas'} · {stages[canonical.start_stage]} · Revisión {canonical.revision}</p>
       <ul className="space-y-1 text-sm text-ink-700">{canonical.registrations.map((r) => {
         const zone = canonical.zones.find((z) => z.id === r.zone_id)
-        return <li key={r.id}>#{r.id} · {r.player1_name} / {r.player2_name} · {zone ? `Zona ${zone.label}` : 'Sin asignar'}</li>
+        return <li key={r.id}>#{r.registration_order} · {r.player1_name} / {r.player2_name} · {zone ? `Zona ${zone.label}` : 'Sin asignar'}</li>
       })}</ul>
       {!canonical.registrations.length && <p className="text-sm text-ink-600">No hay parejas guardadas.</p>}
       <p className="text-sm text-ink-600">Tu propuesta sigue en el formulario. Elegí usar el servidor para descartarla o conservarla con la revisión actual; ninguna opción la envía automáticamente.</p>
@@ -267,10 +290,10 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
     {frozen && <section aria-label="Resumen del fixture" className="space-y-3 rounded-md border border-ink-200 bg-ink-50 p-5">
       <h2 className="font-semibold text-ink-900">Resumen del fixture</h2>
       <p className="text-sm text-ink-700">Estado: {states[event.state]} · Rondas totales: <span className="tabular-nums">{event.total_rounds}</span></p>
-      <p className="text-sm text-ink-600">{event.total_rounds > 0 ? 'Las rondas están disponibles solo para consulta.' : 'Este fixture no tiene rondas.'} La carga de resultados, clasificación y playoffs todavía no están disponibles.</p>
+      <p className="text-sm text-ink-600">{event.total_rounds > 0 ? 'Podés cargar y corregir resultados de rondas hasta confirmar clasificados.' : 'Este fixture no tiene rondas.'} Al confirmar clasificados se cierran los grupos y se crea el cuadro. Los resultados eliminatorios se cargan allí; una corrección se bloquea si ya se jugó un partido siguiente de esa rama.</p>
       <div className="flex flex-wrap gap-2">
         {event.total_rounds > 0 ? <Button variant="secondary" disabled={disabled}
-          onClick={() => onNavigate({ kind: 'round', event_id: event.id, round_number: 1 })}>Consultar rondas</Button> : null}
+          onClick={() => onNavigate({ kind: 'round', event_id: event.id, round_number: 1 })}>Abrir rondas</Button> : null}
         <Button variant="secondary" disabled={disabled} onClick={() => onNavigate({ kind: 'event', event_id: event.id })}>Continuar evento</Button>
       </div>
     </section>}
@@ -300,12 +323,19 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
         <h2 className="mb-4 font-semibold text-ink-900">02 · Parejas <span className="text-ink-500 tabular-nums">({event.registrations.length})</span></h2>
         {!frozen && <form onSubmit={savePair}>
           <fieldset disabled={locked || configDirty || zonesDirty} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Jugador 1"><Input required value={player1} onChange={(e) => setPlayer1(e.target.value)} /></Field>
-              <Field label="Jugador 2"><Input required value={player2} onChange={(e) => setPlayer2(e.target.value)} /></Field>
-            </div>
+            {pairRows.map((row, index) => <div key={row.key} className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
+              <Field label={`Pareja ${index + 1} · Jugador 1`}><Input required value={row.player1}
+                onChange={(e) => setPairRows((current) => current.map((item) => item.key === row.key ? { ...item, player1: e.target.value } : item))} /></Field>
+              <Field label={`Pareja ${index + 1} · Jugador 2`}><Input required value={row.player2}
+                onChange={(e) => setPairRows((current) => current.map((item) => item.key === row.key ? { ...item, player2: e.target.value } : item))} /></Field>
+              {!editing && pairRows.length > 1 ? <Button type="button" variant="ghost" aria-label={`Quitar pareja ${index + 1}`}
+                onClick={() => setPairRows((current) => current.filter((item) => item.key !== row.key))}>Quitar</Button> : null}
+            </div>)}
+            {!editing && <Button type="button" variant="secondary" disabled={pairRows.some((row) => !row.player1.trim() || !row.player2.trim())}
+              onClick={() => setPairRows((current) => [...current, { key: pairSequence.current++, player1: '', player2: '' }])}>Agregar otra pareja</Button>}
             <div className="flex gap-2">
-              <Button type="submit" disabled={!player1.trim() || !player2.trim()}>{editing ? 'Guardar pareja' : 'Agregar pareja'}</Button>
+              <Button type="submit" disabled={pairRows.some((row) => !row.player1.trim() || !row.player2.trim()) || (!editing && pairRows.length > 1 && !operations.addRegistrations)}>
+                {editing ? 'Guardar pareja' : pairRows.length === 1 ? 'Agregar pareja' : `Agregar ${pairRows.length} parejas`}</Button>
               {pairDirty && <Button type="button" variant="ghost" onClick={resetPair}>Cancelar pareja</Button>}
             </div>
           </fieldset>
@@ -316,12 +346,12 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
             return <li key={r.id} className="flex items-center justify-between gap-3 py-3 text-sm">
               <div className="min-w-0">
                 <span className="break-words font-medium text-ink-900">{r.player1_name} / {r.player2_name}</span>
-                <p className="text-xs text-ink-500">#{r.id} · {zone ? `Zona ${zone.label}` : 'Sin asignar'}</p>
+                <p className="text-xs text-ink-500">#{r.registration_order} · {zone ? `Zona ${zone.label}` : 'Sin asignar'}</p>
               </div>
               {!frozen && <div className="flex shrink-0 gap-1">
-                <Button variant="ghost" aria-label={`Editar pareja #${r.id}`} disabled={locked || configDirty || zonesDirty || pairDirty}
-                  onClick={() => { setEditing(r); setPlayer1(r.player1_name); setPlayer2(r.player2_name) }}>Editar</Button>
-                <Button variant="ghost" aria-label={`Eliminar pareja #${r.id}`} disabled={locked || configDirty || zonesDirty || pairDirty}
+                <Button variant="ghost" aria-label={`Editar pareja #${r.registration_order}`} disabled={locked || configDirty || zonesDirty || pairDirty}
+                  onClick={() => { setEditing(r); setPairRows([{ key: pairSequence.current++, player1: r.player1_name, player2: r.player2_name }]) }}>Editar</Button>
+                <Button variant="ghost" aria-label={`Eliminar pareja #${r.registration_order}`} disabled={locked || configDirty || zonesDirty || pairDirty}
                   onClick={() => void mutate(() => operations.deleteRegistration(event.id, r.id, revision))}>Eliminar</Button>
               </div>}
             </li>
@@ -330,17 +360,16 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
       </Card>
       <Card className="p-5">
         <h2 className="mb-2 font-semibold text-ink-900">03 · Reparto y vista previa</h2>
-        <p className="mb-4 text-sm text-ink-600">{event.zone_count === 1 ? 'Todas las parejas pertenecen a Zona A.' : 'Seleccioná las parejas de A; al guardar, las restantes se asignan a B. El reparto manual puede ser desigual. Los cupos insuficientes no impiden guardar el borrador, pero sí generar.'}</p>
+        <p className="mb-4 text-sm text-ink-600">{event.zone_count === 1 ? 'Todas las parejas pertenecen a Zona A.' : 'Seleccioná las parejas que van a la zona A.'}</p>
         {!operations.setZones && <p className="mb-3 text-sm text-ink-600">Asignación manual no implementada en este corte.</p>}
         {!operations.randomizeZones && <p className="mb-3 text-sm text-ink-600">Reparto aleatorio no implementado en este corte.</p>}
-        {unassigned && <p className="mb-3 text-sm text-ink-600">Las parejas sin asignar no pertenecen a B hasta guardar el reparto. La selección manual muestra una propuesta, no una asignación persistida.</p>}
         {!frozen && <fieldset disabled={locked || configDirty || pairDirty}>
           {event.zone_count === 2 && <>
             <div role="group" aria-label="Seleccionar parejas de Zona A" className="mb-4 grid grid-cols-2 gap-2">
               {event.registrations.map((r) => <Button key={r.id} variant={selected.has(r.id) ? 'primary' : 'secondary'}
-                disabled={!operations.setZones} aria-pressed={selected.has(r.id)} aria-label={`Zona A: #${r.id} ${r.player1_name} / ${r.player2_name}`}
+                disabled={!operations.setZones} aria-pressed={selected.has(r.id)} aria-label={`Zona A: #${r.registration_order} ${r.player1_name} / ${r.player2_name}`}
                 className="justify-start break-words text-left" onClick={() => toggleZoneA(r.id)}>
-                #{r.id} · {r.player1_name} / {r.player2_name}
+                #{r.registration_order} · {r.player1_name} / {r.player2_name}
               </Button>)}
             </div>
           </>}
@@ -349,7 +378,9 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
             {event.zone_count === 2 && <>
               <Button variant="secondary" disabled={!operations.randomizeZones || zonesDirty || !event.registrations.length}
                 onClick={() => { const randomize = operations.randomizeZones; if (randomize && !locked && !configDirty && !pairDirty && !zonesDirty) void mutate(() => randomize(event.id, revision)) }}>Repartir aleatoriamente</Button>
-              {zonesDirty && <Button variant="ghost" onClick={() => { setSelected(new Set(event.registrations.filter((r) => r.zone_id === zoneA?.id).map((r) => r.id))); setSelectionEdited(false) }}>Descartar reparto</Button>}
+              {zonesDirty && <Button variant="ghost" onClick={discardZoneEdits}>Descartar cambios</Button>}
+              {hasSavedDistribution && <Button variant="ghost" disabled={!operations.clearZones || locked || configDirty || pairDirty}
+                onClick={discardSavedZones}>Descartar reparto</Button>}
             </>}
           </div>
         </fieldset>}
@@ -358,10 +389,9 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
           {[{ label: 'A', pairs: a }, ...(event.zone_count === 2 ? [{ label: 'B', pairs: b }] : [])].map(({ label, pairs }) => <section key={label} aria-label={`Vista previa Zona ${label}`} className="rounded-md border border-ink-200 bg-ink-50 p-3">
             <h3 className="font-semibold text-ink-900">Zona {label} <span className="tabular-nums">· {pairs.length}</span></h3>
             <p className={`my-2 text-xs ${pairs.length < required ? 'text-red-700' : 'text-ink-600'}`}>Cupo {pairs.length < required ? `insuficiente: ${pairs.length} de ${required}` : 'suficiente'} · Clasifican {required}</p>
-            <ul className="space-y-2 text-sm text-ink-700">{pairs.map((r) => <li key={r.id} className="break-words">#{r.id} · {r.player1_name} / {r.player2_name}</li>)}</ul>
+            <ul className="space-y-2 text-sm text-ink-700">{pairs.map((r) => <li key={r.id} className="break-words">#{r.registration_order} · {r.player1_name} / {r.player2_name}</li>)}</ul>
           </section>)}
         </div>
-        <p className="mt-3 text-xs text-ink-500">El reparto aleatorio aprobado es equilibrado y se persiste antes de generar. Generar conserva el reparto guardado y no vuelve a sortear.</p>
       </Card>
     </div>
     <Card className="space-y-4 p-5">
@@ -372,8 +402,6 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
       {!frozen && <p className="text-sm text-ink-700">Alcance aprobado: generar bloquea nombres, parejas, zonas y etapa. No permite regenerar.</p>}
       {!operations.generateFixture && <p id="fixture-next-cut" className="text-sm text-ink-600">Generación no implementada en este corte; disponible en un próximo corte aunque los cupos sean suficientes.</p>}
       {!frozen && <Button aria-describedby={!operations.generateFixture ? 'fixture-next-cut' : undefined} disabled={!operations.generateFixture || locked || dirty || !event.can_generate} onClick={generateFixture}>Generar fixture</Button>}
-      <p className="text-sm text-ink-600">La carga de resultados, clasificación y playoffs estarán disponibles en próximos cortes. Las rondas generadas se pueden consultar desde el resumen.</p>
-      <p className="text-xs text-ink-500 tabular-nums">Evento #{event.id} · Revisión {event.revision} · Grupos {event.groups_revision}</p>
     </Card>
   </>
 }

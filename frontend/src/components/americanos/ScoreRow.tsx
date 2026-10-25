@@ -1,7 +1,7 @@
 import { useCallback, useId } from 'react'
 import type { ScoreInput, ScoreRowProps, Side } from '../../api/americano-types'
 
-export function ScoreRow({ match, zoneLabel, value, readOnly, errors, onChange, onAdvance, registerInput }: ScoreRowProps) {
+export function ScoreRow({ match, zoneLabel, value, readOnly, errors, onChange, onAdvance, onInvalidInput, registerInput }: ScoreRowProps) {
   const id = useId()
   const nameA = `${match.registration_a.player1_name} / ${match.registration_a.player2_name}`
   const nameB = `${match.registration_b.player1_name} / ${match.registration_b.player2_name}`
@@ -9,7 +9,9 @@ export function ScoreRow({ match, zoneLabel, value, readOnly, errors, onChange, 
   const registerB = useCallback((element: HTMLInputElement | null) => registerInput(match.id, 'b', element), [registerInput, match.id])
 
   function update(side: Side, next: string) {
-    if (readOnly || !/^[0-9]?$/.test(next)) return
+    if (readOnly) return
+    if (/^\d{2,}$/.test(next)) { onInvalidInput?.(); return }
+    if (!/^[0-9]?$/.test(next)) return
     const previous = side === 'a' ? value.games_a : value.games_b
     onChange(match.id, side, next as ScoreInput)
     if (previous === '' && next !== '') onAdvance(match.id, side)
@@ -38,6 +40,7 @@ export function ScoreRow({ match, zoneLabel, value, readOnly, errors, onChange, 
             event.preventDefault()
             const text = event.clipboardData.getData('text')
             if (/^[0-9]$/.test(text)) update(side, text)
+            else if (/^\d{2,}$/.test(text)) onInvalidInput?.()
           }}
           className={`h-14 w-14 rounded-md border bg-surface text-center text-2xl font-semibold tabular-nums text-ink-900
             outline-none focus:ring-2 focus:ring-ink-800 focus:ring-offset-2 read-only:bg-ink-50

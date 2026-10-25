@@ -1,12 +1,14 @@
-# G0 — Contrato compartido de Americanos v2
+# Contrato compartido de Americanos v3 (G0 histórico preservado)
 
-**Versión: 2.1.0. Integrador: I.** Transporte/DTO sin cambios ni incremento de versión por disponibilidad. **Estado actual:14/31 aceptadas (0.1,1.1,1.2,1.3,3.1,3.2,3.3,4.1,4.2,4.3,5.2,6.4,8.1 y8.2),17 pendientes.**4.2/4.3 backend aceptadas con PostgreSQL independiente FULL PASS;5.2/6.4 por auditorías dedicadas;1.x/8.x siguen puras.5.1 PARTIAL;2.x/5.3/6.1–6.3/9.x/G2/G3/G4 pendientes. [Evidencia actual e historia](verification.md).
+**Versión de componentes:3.0.0. Integrador:I. HTTP/DTO:2.2.0 (delta aditivo).** **31/31 tareas originales aceptadas; G3/G4 verificados.** Ensayos PostgreSQL solo descartables; no implica migración activa, despliegue ni archive. [Evidencia actual e historia](verification.md).
 
-### Estado de implementación del slice — 2026-10-22 (sin delta de transporte)
+### Estado de implementación del slice — 2026-10-23
 
-Backend publica **13 operaciones reales**, incluido PUT `/{e}/rounds/{number}/results`. `americanoSetupOperations` conserva **diez métodos** (draft siete+zonas+random+fixture); `americanoRoundOperations`, **cuatro**, con `loadEvent` compartido. Consulta real de ronda/tablas montada en App bajo el guard admin existente; UI editable deshabilitada hasta aprobar5.3. Zonas/random retornan `EventDetail` directo; fixture, `{event,first_round}`.8.1/8.2 siguen puras, sin campeón persistido8.3 ni API playoffs.
+API/cliente **20 operaciones privadas reales**; puertos setup12/draft7,round4,qualification4 yplayoffs3 comparten `loadEvent`, no son conteos sumables. El delta aditivo2.2 agrega alta atómica por lote, limpieza de asignaciones de zona y numeración contigua visible de parejas; las capacidades de alta individual siguen disponibles. Flujo privado de draft a campeón y corrección final, confirmación irreversible/UUID recuperable, grupos congelados y editor Set completo. Sin autoPUT ni avance optimista. Login/cookies/permisos intactos. Ensayos2.3/7.3 verificados solo en PostgreSQL descartable autorizado; aplicación activa/despliegue siguen separados. G3/G4 del cambio cerrado originalmente.
 
-**Generación disponible con confirmación nativa irreversible**, guards y reconciliación GET sin auto-POST; composición/nombres/configuración congelados, sin resorteo/regeneración. Continuación real de consulta y última ronda guardada canónica;1+1 review sin ronda0. `read_only` de dominio es independiente del modo UI consulta. Main/Layout/auth conservados; frontend cambia rutas adicionales protegidas en App, wrappers/setup, RoundPage/hook/ScoreRow y puertos API. Próximo: proponer5.3 guard global/logout voluntario, con confirmación humana antes de escrituras adyacentes a auth; sin cambios previstos de login/cookies/permisos. Migración/activación productiva separadas. El registro inferior conserva su snapshot histórico.
+### Delta3.0.0 — componentes, sin delta HTTP
+
+`AmericanoPlayoffsPageProps` pasa de puerto readonly2 a `AmericanoPlayoffsOperations` (`loadEvent/loadPlayoffs/saveKnockout`) y requiere `onDirtyChange(draft:DirtyNavigationDraft|null):void`. Es incompatible para consumidores de la entrega readonly: declarar versión mayor, no ocultarlo como disponibilidad HTTP. Tipo, único consumidor productivo (`AmericanoStageRoute`) y productor actualizados coordinadamente; descriptor usa callbacks estables/getters vivos y se republica por estado. `AmericanoPlayoffsReadOperations` permanece exportado para consultas, pero no satisface props del editor. Fixtures solo DTO no producen props/descriptores y siguen válidos sin cambios. Typecheck y QA del consumidor real verifican el nuevo contrato. Resto de props/DTO y18 rutas conservados.
 
 ### Registro histórico de aprobación humana — 2026-10-21 / delta 2.1.0
 
@@ -19,7 +21,7 @@ Fuente: respuesta del usuario **«confirma todas ls decisiones que tenes ahi.»*
 - **Capacidades aún no implementadas en este slice:** asignación manual de zonas, random, generación, rondas, clasificación y playoffs siguen explícitamente deshabilitadas. El split publicado usa `AmericanoDraftOperations`, `AmericanoSetupCapabilities`, `AmericanoListPageProps` y `AmericanoSetupPageProps` (§5), sin simular las18 operaciones. `can_generate` expresa elegibilidad de dominio, no disponibilidad de la operación. El subconjunto frontend draft ya fue verificado con API real; no completa5.1/5.2.
 - **Límites y efecto metadata:** sin cambios de login/auth ni imports de registro en `migrations/env.py`/`database/session.py`, migraciones aplicadas, BD de usuario, builds, commits o despliegues. La cadena `main→router→service→models` sí registra las ocho tablas en metadata compartida por import, **sin ejecutar DDL de inicio**. Tablas creadas únicamente en SQLite nuevo descartable de pruebas con fixtures aisladas; no prueba locks PostgreSQL. Guard global/data router/logout queda fuera del slice. Activación del esquema productivo requiere autorización separada. Esta pasada documental no ejecuta tests ni servidores.
 
-**Publicación frontend alineada:** las seis plantillas/etiquetas/fixtures reflejan D3/D6/D8 aprobados; `DecisionStatus.proposed` sigue válido para futuras plantillas. [verification.md](verification.md) conserva los snapshots históricos; prevalece su nota inicial vigente14/31.
+**Publicación frontend alineada:** las seis plantillas/etiquetas/fixtures reflejan D3/D6/D8 aprobados; `DecisionStatus.proposed` sigue válido para futuras plantillas. [verification.md](verification.md) conserva snapshots históricos; la primera sección registra el cierre vigente31/31.
 
 ### Registro histórico: delta 2.0.0 frente a 1.0.0
 
@@ -59,8 +61,8 @@ Fuentes normativas: [D3–D9](design.md), [AE](specs/americano-admin-events/spec
 | D3: aleatorio equilibrado, diferencia <=1 | Aprobado; manual desigual permitido |3.2/3.3 aceptadas; reparto guardado sin shuffle. Contención PostgreSQL3.3 aceptada previamente, sin nueva prueba en4.1. Ningún algoritmo aleatorio en G0/A. |
 | D3: congelar composición/nombres/configuración al generar, sin regeneración | Aprobado, AE-03 |3.3 aceptada, incluso review cero partidos; congelación preservada en4.1. |
 | D6: semifinales directas | Aprobado | Una zona 1-4/2-3; dos A1-B2/B1-A2. |
-| D6: cuartos y final directos | Aprobado | Las seis plantillas actuales son approved; constructor8.1 puro aceptado. Confirmación real sigue fuera del slice. Ninguna plantilla default oculta; proposed futuro preservado. |
-| D8: terminal exacto del set, correcciones/final | Aprobado |8.2 pura aceptada tras P2 resuelto/revisión PASS;8.3 y API resultados futuros. Constructor8.1, snapshot y cuadro read-only no dependen del set. |
+| D6: cuartos y final directos | Aprobado | Las seis plantillas actuales son approved; constructor8.1 puro aceptado. Confirmación real7.2 y cuadros completos integrados. Ninguna plantilla default oculta; proposed futuro preservado. |
+| D8: terminal exacto del set, correcciones/final | Aprobado |8.2 pura aceptada tras P2 resuelto/revisión PASS;8.3 y editor8.4 aceptados con evidencia propia. Constructor8.1, snapshot y cuadro read-only no dependen del set. |
 
 Plantillas aprobadas: cuartos una zona Q1=1-8,Q2=4-5,Q3=2-7,Q4=3-6; dos Q1=A1-B4,Q2=B2-A3,Q3=B1-A4,Q4=A2-B3. Final directa una zona1-2/dos A1-B1. Q1/Q2→S1 lados a/b; Q3/Q4→S2 a/b; S1/S2→F1 a/b. Semifinales usan S1/S2 en el orden aprobado. El parámetro explícito `seeding_template` conserva estos cruces y destinos.
 
@@ -81,9 +83,11 @@ El archivo `frontend/src/api/americano-types.ts` es el esquema exacto de campos 
 | GET `/{e}` | Sin body | 200 `EventDetail` | `loadEvent(e)` |
 | PATCH `/{e}` | `UpdateEventRequest` | 200 `EventDetail` | `updateEvent(e,request)` |
 | POST `/{e}/registrations` | `RegistrationRequest` | 201 `EventDetail` | `addRegistration(e,request)` |
+| POST `/{e}/registrations/bulk` | `BulkRegistrationRequest` | 201 `EventDetail` | `addRegistrations(e,request)` |
 | PATCH `/{e}/registrations/{r}` | `UpdateRegistrationRequest` | 200 `EventDetail` | `updateRegistration(e,r,request)` |
 | DELETE `/{e}/registrations/{r}` | **Query** `expected_revision=N`, sin body | 200 `EventDetail` | `deleteRegistration(e,r,{expected_revision})` |
 | PUT `/{e}/zones` | `SetZonesRequest` | 200 `EventDetail` | `setZones(e,request)` |
+| DELETE `/{e}/zones` | **Query** `expected_revision=N`, sin body | 200 `EventDetail` | `clearZones(e,{expected_revision})` |
 | POST `/{e}/zones/randomize` | `RevisionRequest` | 200 `EventDetail` | `randomizeZones(e,request)` |
 | POST `/{e}/fixture` | `RevisionRequest` | 200 `GenerateFixtureResponse` | `generateFixture(e,request)` |
 | GET `/{e}/rounds/{number}` | Sin body | 200 `RoundResponse` | `loadRound(e,number)` |
@@ -95,7 +99,7 @@ El archivo `frontend/src/api/americano-types.ts` es el esquema exacto de campos 
 | GET `/{e}/playoffs` | Sin body | 200 `PlayoffsResponse` | `loadPlayoffs(e)` |
 | PUT `/{e}/playoffs/{n}/result` | `SaveKnockoutRequest` | 200 `PlayoffsResponse` | `saveKnockout(e,n,request)` |
 
-La matriz conserva18 operaciones contractuales; **13 publicadas**: diez de setup más GET ronda/standings y PUT de resultados. Puertos setup diez/round cuatro comparten `loadEvent`, no son14 métodos únicos. **Cinco futuras:** GET qualification, PUT resoluciones, POST confirmación y GET/PUT playoffs. **POST `/{e}/fixture` + `RevisionRequest` →200 `GenerateFixtureResponse={event,first_round}`** conserva versión/shape; `/generate` no es ruta publicada.
+La matriz publica las20 operaciones contractuales: setup12, GET ronda/standings, PUT resultados de ronda, GET qualification, PUT tie-resolutions, POST confirm-qualifiers, GET playoffs y PUT resultado eliminatorio. Los puertos comparten loadEvent. **POST `/{e}/fixture` + `RevisionRequest`→200 `GenerateFixtureResponse={event,first_round}`** conserva shape; `/generate` no es ruta publicada.
 
 DELETE con query permite usar `api.delete(path)` sin cambiar el cliente base ni perder la revisión de D5. El cliente draft codifica `expected_revision` en query, verificado con HTTP real. No responder204: U necesita revisión/listado canónicos después de eliminar.
 
@@ -108,8 +112,11 @@ DELETE con query permite usar `api.delete(path)` sin cambiar el cliente base ni 
 | `CreateEventRequest` | `name: string` recortado no vacío, `zone_count:1\|2`, `start_stage:StartStage`; todos requeridos, sin revisión/inscripciones iniciales. |
 | `UpdateEventRequest` | Revisión + `name?`, `zone_count?`, `start_stage?`; al menos uno presente, ninguno acepta null. Cambio de cantidad de zonas conserva A, crea/elimina B en draft; una zona asigna todas a A, pasar a dos conserva asignaciones A y permite completar reparto. |
 | `RegistrationRequest` | Revisión + `player1_name`, `player2_name`, ambos strings recortados no vacíos; identidad y orden asignados por servidor. Una zona asigna A; dos permite `zone_id=null` hasta PUT de reparto. |
+| `BulkRegistrationRequest` | Revisión + `registrations:RegistrationInput[]` con mínimo dos parejas; cada elemento contiene dos strings recortados no vacíos. Alta atómica en una revisión, con órdenes consecutivos. Sigue disponible el POST individual para una pareja. |
 | `UpdateRegistrationRequest` | Revisión + uno o ambos nombres opcionales no vacíos, nunca null; no permite cambiar zona/orden/ID. |
 | `SetZonesRequest` | Revisión + `zone_count`, `zone_a_registration_ids:integer[]` únicos y propios. Dos zonas: A=selección, B=complemento; una zona exige conjunto exacto de todas las inscripciones como A. Selección vacía válida en draft de dos, pero puede impedir generar. |
+| Orden/numeración visible | `registration_order` es ordinal contiguo desde1, nunca el ID de fila. Al eliminar se compactan los supervivientes; la próxima alta usa el siguiente ordinal libre, incluso después de eliminar todas las parejas. |
+| DELETE `/{e}/zones` | Query `expected_revision=N`; solo en borrador con dos zonas. Limpia a `zone_id=null` todas las parejas, tanto si el reparto guardado fue manual como aleatorio. En una propuesta manual, deseleccionar una pareja de A la muestra temporalmente como `Sin asignar`; al guardar, las no seleccionadas se asignan a B. |
 | `SaveRoundRequest` | Revisión + `results:GroupResult[]`, conjunto exacto de partidos de la ronda. Cada uno `{match_id,games_a,games_b}`, games strict0..9, sin null/ausentes; duplicados, faltantes o extra422. |
 | `SaveTieResolutionsRequest` | Ambas revisiones + `resolutions:TieResolution[]`, reemplazo completo de **todas y solo** plazas empatadas relevantes `{zone_id,position,registration_id}`. Sin selección incompleta, duplicados ni IDs ajenos al bloque. Lista vacía válida si no hay plazas a resolver. Slots firmes no se envían. |
 | `ConfirmQualifiersRequest` | Ambas revisiones + `confirmation_key:string UUID`; validar string y normalizar con `str(UUID(value))` antes de comparar/persistir. No recibe seeds, plantilla ni nodos del navegador. |
@@ -197,16 +204,16 @@ GET de ronda existente pero secuencialmente bloqueada devuelve409 `round_locked`
 
 URLs de UI: `/admin/americanos` listado; `/:eventId` resuelve continuación; `/:eventId/configuracion`; `/:eventId/rondas/:roundNumber`; `/:eventId/clasificados`; `/:eventId/playoffs`. Número/ID inválido o ronda bloqueada→continuación segura obtenida del evento. Conservar URL de ronda explícita desbloqueada al refrescar, incluso tras cierre con read_only. No localStorage de nombres/scores.
 
-**Wiring vigente de consulta (transporte2.1.0):** `AmericanoEventRoute` resuelve continuación canónica; setup inyecta diez métodos y `AmericanoRoundRoute` cuatro, siempre con `mode="consultation"`. Review/historial ofrecen última ronda solo con `total_rounds` positivo igual a `max_unlocked_round`; cero partidos no inventa ronda0. Clasificación/playoffs muestran etapa pendiente y acceso a consulta, sin llamar APIs futuras. Rutas adicionales en App conservan el guard admin; main/Layout/auth sin cambios.5.2/6.4 aceptadas;5.1/G2 y UI editable pendientes de integración global5.3.
+**Wiring vigente al cierre original:** HTTP/DTO2.1.0; componentes3.0.0. AmericanoEventRoute resuelve continuación canónica; setup10,round4 con mode editable y autoridad read_only backend; AmericanoStageRoute inyecta qualification4 o playoffs3+onDirtyChange. Guard/data router conservan límites Auth/público.1+1 no inventa ronda0; resultados/avance/campeón integrados.5.1/8.4 completas; G3/G4 pendientes.
 
-Dirty: baseline persistido separado de strings locales. Guardar/descartar/permanecer para rutas, Back/Forward, enlaces admin y logout; beforeunload para recarga/salida, también si hay escritura/reconciliación pendiente aunque dirty=false. Guardar continúa solo tras éxito completo; descartar restaura baseline canónico y devuelve éxito; permanecer cancela. I implementa guard/router en5.3, R publica descriptor dirty (§5), sin invocar useBlocker sobre BrowserRouter actual.
+Dirty de ronda: baseline persistido separado de strings locales. Guard5.3 implementado con guardar/descartar/permanecer para rutas/historial/enlaces/logout y beforeunload; bloquea también pending aunque dirty=false. Guardar exige éxito limpio sin pending; descartar restaura baseline y false cancela. Clasificación conserva solicitud incierta y exige recuperación/adopción explícita, sin POST automático.
 
 ### 3.3 Recuperación de setup draft publicada
 
 - `Recargar evento` mantiene montado el editor y conserva propuesta, strings e identidad de inscripción durante/después del GET. Tras conflicto/fallo incierto, bloquear nuevas escrituras hasta obtener estado canónico y una adopción explícita. GET fallido conserva edición y bloqueo; invalida la comparación anterior, sin baseline inventado ni descarte automático. No promete conservar borradores tras recarga completa del documento.
 - `Usar datos guardados` adopta evento/revisión canónicos y descarta propuesta; `Conservar mi edición` adopta revisión/baseline, conservando la propuesta, **sin enviar una escritura**. Requiere draft y, al editar pareja, que su ID siga existiendo. No recrear una inscripción eliminada ni trasladar asignaciones de zona obsoletas.
 - El merge de configuración es **por campo contra el baseline previo**: conservar solo nombre, cantidad de zonas o etapa realmente editados; los campos no editados se toman del canónico, también al conservar una edición de pareja. Un posterior guardado explícito usa revisión actual y configuración fusionada; no sobreescribe cambios concurrentes de campos intactos.
-- Ante POST de alta de inscripción con respuesta incierta, mostrar advertencia de que pudo persistirse y pedir revisar las parejas guardadas. Keep no reenvía ni recrea automáticamente. Nombres repetidos son válidos; un nuevo envío explícito puede crear otra pareja y no se deduplica por nombre. No asumir que un fallo de red implica rollback.
+- Ante POST de alta individual o por lote con respuesta incierta, mostrar advertencia de que pudo persistirse y pedir revisar las parejas guardadas. Keep no reenvía ni recrea automáticamente. Nombres repetidos son válidos; un nuevo envío explícito puede crear otra pareja y no se deduplica por nombre. No asumir que un fallo de red implica rollback.
 - 3.2: propuesta de zonas conservada para comparar tras409/GET fallido, pero keep de asignación obsoleta bloqueado; adoptar canónico explícitamente, sin trasplantar IDs ni escribir. Guards locales config/pareja/zona impiden mutaciones incompatibles; no implementan5.3. PUT200 de zonas y POST201 de inscripción confirmados en servidor con respuesta perdida fueron verificados live: reconciliación GET explícita, sin reintento/duplicado automático.
 - 3.3 implementada: generar requiere capacidad, draft/elegibilidad, sin edición config/pareja/zonas ni pending y confirmación nativa irreversible. Se adopta `response.event`; ante respuesta incierta, GET canónico automático puede adoptar estado generado read-only. Si GET falla, las escrituras siguen bloqueadas hasta verificar; si devuelve draft, requiere adopción explícita y nueva intención confirmada, nunca retry automático de POST. Live verificó dos respuestas realmente comprometidas y luego perdidas, GET exitoso/fallido y peticiones abortadas antes de llegar al backend. La concurrencia PostgreSQL de3.3 quedó validada por separado mediante veinte carreras reales; la recuperación de respuestas perdidas no sustituye esa prueba.
 
@@ -497,29 +504,29 @@ Convention parametriza objetivo mínimo y ventaja necesaria: al alcanzar objetiv
 
 ## 5. Exportaciones frontend y preparación por inyección
 
-Todas las pantallas/componentes/hooks tienen **exports nombrados**, no default ni barrels nuevos. `AmericanoOperations` conserva18 operaciones con `Promise` y DTO exactos; no implica18 métodos HTTP implementados. `api/americanos.ts` publica draft siete/setup diez y `americanoRoundOperations: AmericanoRoundOperations` cuatro, con `loadEvent` compartido:13 únicos. Sin objeto ficticio de18 métodos ni fallbacks mock. DTO2.1.0 sin cambios; el puerto round y modo de consulta son integración frontend, no delta HTTP. Importar tipos con `import type`.
+Todas las pantallas/componentes/hooks tienen **exports nombrados**, sin default ni barrels nuevos. AmericanoOperations declara20 operaciones exactas, implementadas por puertos estrechos reales: draft7/setup12/round4/qualification4/playoffs3 con loadEvent compartido. Sin mocks productivos ni fallbacks. HTTP/DTO2.2.0 aditivo; componentes3.0.0 por nuevas props requeridas del editor. Importar tipos con import type.
 
 | Tipo publicado | Contrato del slice setup con fixture |
 |---|---|
 | `AmericanoDraftOperations` | `Pick<AmericanoOperations, 'listEvents' \| 'createEvent' \| 'loadEvent' \| 'updateEvent' \| 'addRegistration' \| 'updateRegistration' \| 'deleteRegistration'>`; siete métodos de §2.1. |
-| `AmericanoSetupCapabilities` | `Pick<AmericanoOperations, 'setZones' \| 'randomizeZones' \| 'generateFixture'>`; setup inyecta las tres reales. El puerto draft conserva siete métodos. |
+| `AmericanoSetupCapabilities` | `Pick<AmericanoOperations, 'addRegistrations' \| 'setZones' \| 'clearZones' \| 'randomizeZones' \| 'generateFixture'>`; setup inyecta las cinco capacidades reales. El puerto draft conserva siete métodos y alta individual. |
 | `AmericanoListPageProps` | `operations: Pick<AmericanoDraftOperations, 'listEvents' \| 'createEvent'>` y `onNavigate(target:AmericanoNavigation):void`. |
 | `AmericanoSetupPageProps` | `operations: Pick<AmericanoDraftOperations, 'loadEvent' \| 'updateEvent' \| 'addRegistration' \| 'updateRegistration' \| 'deleteRegistration'> & Partial<AmericanoSetupCapabilities>`, `eventId:AmericanoId`, `onNavigate(target:AmericanoNavigation):void`. |
 
-El wiring setup inyecta `setZones`/`randomizeZones`/`generateFixture`; round conecta `loadEvent`/`loadRound`/`loadStandings`/`saveRound`, con escritura UI deshabilitada en App por modo consulta. Cinco APIs futuras ausentes.5.2/6.4 aceptadas;5.1 PARTIAL y5.3 pendiente de confirmación humana. Estrategia: [ReviewWorkloadForecast](tasks.md#reviewworkloadforecast--estrategia-resuelta-2026-10-21); procedencia/límites en `verification.md`.
+El wiring setup/round/clasificación/cuadro completo está publicado: grupos editables hasta cierre y eliminatorias a set completo hasta campeón.5.1/8.4 aceptadas. Estrategia/historia en tasks.md y verification.md; ninguna entrega autoriza migraciones/despliegue.
 
 | Dueño/archivo | Export y contrato de entrada |
 |---|---|
 | U `AmericanosPage.tsx` | `AmericanosPage(props: AmericanoListPageProps)` |
 | U `AmericanoSetupPage.tsx` | `AmericanoSetupPage(props: AmericanoSetupPageProps)` |
-| U `AmericanoQualificationPage.tsx` | `AmericanoQualificationPage(props: AmericanoEventPageProps)` |
-| U `AmericanoPlayoffsPage.tsx` | `AmericanoPlayoffsPage(props: AmericanoEventPageProps)`; primero read-only, resultados después de implementar D8/API real en su slice. |
+| U `AmericanoQualificationPage.tsx` | `AmericanoQualificationPage(props: AmericanoQualificationPageProps)`; puerto4 métodos `loadEvent/loadQualification/saveTieResolutions/confirmQualifiers`. |
+| U `AmericanoPlayoffsPage.tsx` | `AmericanoPlayoffsPage(props:AmericanoPlayoffsPageProps)`; operations:AmericanoPlayoffsOperations (loadEvent/loadPlayoffs/saveKnockout), eventId,onNavigate,onDirtyChange requerido. Descriptor dirty/pending equivalente a ronda; null al desmontar. |
 | R `AmericanoRoundPage.tsx` | `AmericanoRoundPage(props: AmericanoRoundPageProps)` |
 | R `ScoreRow.tsx` | `ScoreRow(props: ScoreRowProps)` |
 | R `StandingsDrawer.tsx` | `StandingsDrawer(props: StandingsDrawerProps)` |
 | U `QualificationSlots.tsx` | `QualificationSlots(props: QualificationSlotsProps)` |
 | R `useRoundDraft.ts` | `useRoundDraft(round: RoundResponse): RoundDraftState` |
-| I futuro `useDirtyNavigation.ts` | `useDirtyNavigation(draft: DirtyNavigationDraft \| null): void`; solo bajo data router en5.3. I mantiene descriptor de página activa para guard de rutas/logout. |
+| I `useDirtyNavigation.tsx` | `DirtyNavigationProvider` bajo data router; `useDirtyNavigation(): (draft: DirtyNavigationDraft \| null) => void` entrega callback estable compatible con `onDirtyChange`; `useGuardedLogout()` recibe la acción de logout. I mantiene el descriptor del puesto activo (ronda o eliminatorias) para rutas/logout; null en cleanup. Sin delta HTTP ni consumidores previos de un hook implementado. |
 
 Props completas heredadas de2.0.0 (listado/setup usan el split2.1.0 de arriba; puesto de ronda v2 sin cambios):
 
@@ -580,6 +587,6 @@ Este archivo es también registro persistente de la única tarea entregada; no c
 
 ## 8. Estado actual y siguiente corte
 
-**14/31 aceptadas,17 pendientes** según [checklist](tasks.md). Nuevas4.2/4.3/5.2/6.4; API13, setup diez/round cuatro con `loadEvent` compartido, cinco futuras.5.1 PARTIAL;2.x/5.3/6.1–6.3/9.x/G2/G3/G4 pendientes. Transporte2.1.0 e historia preservados.
+**31/31 tareas aceptadas; G3/G4 verificados.** API/cliente **18 operaciones privadas reales**; puertos setup10/draft7,round4,qualification4 yplayoffs3 comparten `loadEvent`, no son conteos sumables. Contrato de componentes **3.0.0**; HTTP/DTO conserva shapes **2.1.0**. Confirmación, cuadro, resultados y campeón real integrados; grupos permanecen cerrados. No se activó en producción.
 
-**Continuación: proponer5.3**, guard global dirty y logout voluntario; confirmación humana requerida antes de escrituras adyacentes a auth. Consulta montada, UI editable deshabilitada.4.3 FULL PASS PostgreSQL tras P2 corregido, sin afirmar HTTP PostgreSQL medido.8.2 sigue pura;8.3 pendiente. Trabajo posterior a `2bc5abf` sin commit; notas compactas, pruebas externas y tests significativos, sin artefactos runtime/logs en código productivo. Migración/activación productiva separadas.
+**Continuación acotada:** obtener autorización separada para ensayo PostgreSQL descartable2.3 (upgrade/down/reup preservando liga) y carrera7.3 (dos sesiones score/confirm), después consolidar9.3/handoff HIGH/CRITICAL. Alternativa sin DDL ahora: revisión estática adicional, sin presentarla como sustituto del ensayo. No commit/push/archivo/despliegue automáticos; trabajo local tras `5908f16`.

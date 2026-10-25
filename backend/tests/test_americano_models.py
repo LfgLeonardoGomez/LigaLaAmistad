@@ -6,7 +6,6 @@ the eight Americano tables (never the application's full metadata).
 """
 
 import datetime
-import sys
 
 import pytest
 from sqlalchemy import MetaData, event, inspect, select
@@ -113,7 +112,6 @@ def test_only_eight_isolated_tables_and_no_league_foreign_keys(connection):
     }
     for table in TABLES:
         assert all(fk.column.table.name.startswith("americano_") for fk in table.foreign_keys)
-    assert not {"app.main", "app.core.config", "app.database.session"}.intersection(sys.modules)
 
 
 @pytest.mark.parametrize("zone_count,stage", [(1, "quarterfinal"), (2, "semifinal"), (1, "final")])

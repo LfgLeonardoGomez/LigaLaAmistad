@@ -4,7 +4,7 @@
 
 Jugar un cuadro privado desde cuartos, semifinales o final con parejas clasificadas inmutables, resultado a set único y avance hasta campeón.
 
-**Disponibilidad actualizada2026-10-22:** D6/D8 aprobados; [contrato2.1.0](../../contracts.md) intacto. **14/31 aceptadas,17 pendientes** según [checklist](../../tasks.md); nuevas4.2/4.3 backend FULL PASS PostgreSQL y5.2/6.4 por auditorías dedicadas.1.x/8.x siguen puras, sin campeón persistido8.3 ni API playoffs. API13, setup10/round4 con `loadEvent` compartido; cinco APIs futuras de clasificación/confirmación/playoffs. Consulta real protegida montada; UI editable deshabilitada hasta aprobar5.3.5.1 PARTIAL;2.x/5.3/6.1–6.3/9.x/G2/G3/G4 pendientes. Próximo proponer5.3 con confirmación humana previa; seis plantillas approved/futuras proposed preservadas. [Evidencia e historia](../../verification.md); solo disponibilidad, requisitos inferiores intactos.
+**Disponibilidad:** D3/D6/D8 aprobados; componentes[3.0.0](../../contracts.md), HTTP/DTO2.1.0 intacto. **31/31 tareas aceptadas; G3/G4 verificados** según[checklist](../../tasks.md). API/cliente18; flujo privado completo hasta campeón/corrección final con grupos cerrados, guard dirty/pending y recuperación sin autoPUT. Ensayo/carrera PostgreSQL completados solo en entorno descartable; aplicación activa y despliegue requieren aprobación separada. [Evidencia/historia](../../verification.md); requisitos inferiores intactos.
 
 ## ADDED Requirements
 
