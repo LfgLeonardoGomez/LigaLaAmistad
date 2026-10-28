@@ -1,4 +1,4 @@
-// Component contract v3.0.0; HTTP/DTO unchanged from v2.1.0. Type exports only.
+// Component contract with additive real-court selection and match assignments.
 // Source: openspec/changes/admin-americanos/contracts.md.
 export type AmericanoId = number
 export type EventState = 'draft' | 'groups' | 'review' | 'playoffs' | 'completed'
@@ -12,11 +12,12 @@ export type DecisionStatus = 'approved' | 'proposed'
 
 export interface RevisionRequest { expected_revision: number }
 export interface GroupSourceRequest extends RevisionRequest { source_groups_revision: number }
-export interface CreateEventRequest { name: string; zone_count: ZoneCount; start_stage: StartStage }
+export interface CreateEventRequest { name: string; zone_count: ZoneCount; start_stage: StartStage; courts?: number[] }
 export interface UpdateEventRequest extends RevisionRequest {
   name?: string
   zone_count?: ZoneCount
   start_stage?: StartStage
+  courts?: number[]
 }
 export interface RegistrationRequest extends RevisionRequest { player1_name: string; player2_name: string }
 export interface RegistrationInput { player1_name: string; player2_name: string }
@@ -56,6 +57,7 @@ export interface EventSummary {
   state: EventState
   zone_count: ZoneCount
   start_stage: StartStage
+  courts: number[]
   revision: number
   groups_revision: number
   registration_count: number
@@ -63,6 +65,7 @@ export interface EventSummary {
   saved_rounds: number
   max_unlocked_round: number
   continuation: Continuation
+  champion: Registration | null
 }
 export interface ZoneQuota {
   zone_id: AmericanoId
@@ -94,6 +97,7 @@ export type GroupMatch = GroupScore & {
   id: AmericanoId
   zone_id: AmericanoId
   display_order: number
+  court_number: number | null
   registration_a: Registration
   registration_b: Registration
 }
@@ -210,6 +214,7 @@ export type KnockoutScore =
   | { games_a: number; games_b: number; set_complete: true }
 export type KnockoutNode = KnockoutScore & NodeRef & {
   id: AmericanoId
+  court_number: number | null
   registration_a: Registration | null
   registration_b: Registration | null
   next_match_id: AmericanoId | null
@@ -225,6 +230,7 @@ export interface PlayoffsResponse {
   revision: number
   groups_revision: number
   start_stage: StartStage
+  courts: number[]
   zones: Zone[]
   snapshots: QualifierSnapshot[]
   nodes: KnockoutNode[]
@@ -280,6 +286,7 @@ export interface AmericanoOperations {
   confirmQualifiers(eventId: AmericanoId, request: ConfirmQualifiersRequest): Promise<ConfirmationResponse>
   loadPlayoffs(eventId: AmericanoId): Promise<PlayoffsResponse>
   saveKnockout(eventId: AmericanoId, nodeId: AmericanoId, request: SaveKnockoutRequest): Promise<PlayoffsResponse>
+  assignKnockoutCourt(eventId: AmericanoId, nodeId: AmericanoId, request: RevisionRequest & { court_number: number }): Promise<PlayoffsResponse>
 }
 
 export interface AmericanoPageProps {
@@ -298,6 +305,7 @@ export type AmericanoQualificationOperations = Pick<AmericanoOperations,
   'loadEvent' | 'loadQualification' | 'saveTieResolutions' | 'confirmQualifiers'>
 export type AmericanoPlayoffsReadOperations = Pick<AmericanoOperations, 'loadEvent' | 'loadPlayoffs'>
 export type AmericanoPlayoffsOperations = AmericanoPlayoffsReadOperations & Pick<AmericanoOperations, 'saveKnockout'>
+  & Partial<Pick<AmericanoOperations, 'assignKnockoutCourt'>>
 export interface AmericanoListPageProps {
   operations: Pick<AmericanoDraftOperations, 'listEvents' | 'createEvent'>
   onNavigate: (target: AmericanoNavigation) => void

@@ -48,3 +48,6 @@ docs/__Inspiraci*/*.png
 
 # Worktrees de agentes en segundo plano
 .claude/
+
+# Local development process IDs and logs
+.local-dev/

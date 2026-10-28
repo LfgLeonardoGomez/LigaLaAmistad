@@ -376,7 +376,7 @@ function RoundWorkstation({ initialRound, operations, onNavigate, onDirtyChange,
               return row && zone ? (
                 <fieldset key={match.id} className="min-w-0" aria-label={`Zona ${zone.label}, partido ${match.display_order}`}>
                   <legend className="sr-only">Zona {zone.label}, partido {match.display_order}</legend>
-                  <p className="px-5 pt-3 text-xs font-semibold text-ink-500">Zona {zone.label} <span className="ml-2 font-normal">· Partido {match.display_order}</span></p>
+                  <p className="px-5 pt-3 text-xs font-semibold text-ink-500">Zona {zone.label} <span className="ml-2 font-normal">· Partido {match.display_order}</span><span className="ml-3 rounded bg-emerald-50 px-2 py-1 text-emerald-800">{match.court_number ? `Cancha ${match.court_number}` : 'Cancha sin asignar'}</span></p>
                   <ScoreRow match={match} zoneLabel={zone.label} value={row} readOnly={readOnly || saving} errors={draft.errors[match.id] ?? {}}
                     onChange={(matchId, side, value) => { if (!canAct() || readOnly || busy.current) return; draft.setScore(matchId, side, value); setNotice('') }}
                     onAdvance={advance} onInvalidInput={() => { setSaveError(null); setNotice('Ingresá un solo dígito (0–9).') }} registerInput={registerInput} />

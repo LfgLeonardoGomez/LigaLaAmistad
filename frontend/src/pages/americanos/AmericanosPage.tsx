@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { AmericanoListPageProps, EventSummary, StartStage, ZoneCount } from '../../api/americano-types'
-import { Alert, Button, Card, EmptyState, Field, Input, PageHeader, Select, Spinner, Table, Td, Th } from '../../components/ui'
+import { Alert, Button, Card, EmptyState, Field, Input, Select, Spinner, Table, Td, Th } from '../../components/ui'
+import { ALL_COURTS, CourtSelector } from './CourtSelector'
+import { SetupSteps } from './SetupSteps'
 
 const states = { draft: 'Borrador', groups: 'Grupos', review: 'Revisión', playoffs: 'Playoffs', completed: 'Finalizado' }
 const stages = { quarterfinal: 'Cuartos de final', semifinal: 'Semifinales', final: 'Final' }
@@ -15,6 +17,7 @@ export function AmericanosPage({ operations, onNavigate }: AmericanoListPageProp
   const [name, setName] = useState('')
   const [zones, setZones] = useState<ZoneCount>(1)
   const [stage, setStage] = useState<StartStage>('semifinal')
+  const [courts, setCourts] = useState<number[]>(ALL_COURTS)
   const [saving, setSaving] = useState(false)
   const [uncertain, setUncertain] = useState(false)
   const inFlight = useRef(false)
@@ -35,13 +38,13 @@ export function AmericanosPage({ operations, onNavigate }: AmericanoListPageProp
 
   async function create(e: FormEvent) {
     e.preventDefault()
-    if (inFlight.current || loading || uncertain || !name.trim()) return
+    if (inFlight.current || loading || uncertain || !name.trim() || !courts.length) return
     const started = generation.current
     inFlight.current = true
     setSaving(true)
     setCreateError(null)
     try {
-      const next = await operations.createEvent({ name: name.trim(), zone_count: zones, start_stage: stage })
+      const next = await operations.createEvent({ name: name.trim(), zone_count: zones, start_stage: stage, courts })
       if (generation.current === started) {
         setEvents((current) => [next, ...current.filter((item) => item.id !== next.id)])
         setName('')
@@ -59,29 +62,36 @@ export function AmericanosPage({ operations, onNavigate }: AmericanoListPageProp
   }
 
   return <div className="space-y-6">
-    <PageHeader title="Americanos" description="Eventos independientes de parejas fijas. Retomá un evento o consultá su historial."
-      action={<Button variant="secondary" disabled={loading || saving} onClick={() => setReload((n) => n + 1)}>Recargar lista</Button>} />
-    <Card className="p-5">
-      <h2 className="mb-4 text-base font-semibold text-ink-900">Nuevo evento</h2>
-      <form onSubmit={create}>
-        <fieldset disabled={loading || saving || uncertain} className="grid items-end gap-4 lg:grid-cols-[2fr_1fr_1fr_auto]">
+    <Card className="space-y-5 p-5 sm:p-6">
+      <SetupSteps current={1} />
+      <h2 className="text-base font-semibold text-ink-900">Nuevo evento</h2>
+      <form onSubmit={create} className="space-y-5">
+        <div className="grid items-start gap-6 md:grid-cols-2 md:gap-10">
+        <fieldset disabled={loading || saving || uncertain} className="space-y-4">
           <Field label="Nombre del nuevo evento"><Input required value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="Zonas"><Select value={zones} onChange={(e) => setZones(Number(e.target.value) as ZoneCount)}><option value="1">Una zona</option><option value="2">Dos zonas</option></Select></Field>
           <Field label="Inicio de eliminatorias"><Select value={stage} onChange={(e) => setStage(e.target.value as StartStage)}>{Object.entries(stages).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></Field>
-          <Button type="submit" disabled={!name.trim()}>{saving ? 'Creando…' : 'Crear borrador'}</Button>
         </fieldset>
+        <div className="w-full md:max-w-sm md:justify-self-end"><CourtSelector value={courts} onChange={setCourts} disabled={loading || saving || uncertain} /></div>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-ink-200 pt-5">
+          <Button type="submit" disabled={loading || saving || uncertain || !name.trim() || !courts.length}>{saving ? 'Creando…' : 'Crear borrador y agregar parejas'}</Button>
+          <p className="max-w-sm text-xs leading-relaxed text-ink-500">Después cargás las parejas y revisás las zonas antes de generar el fixture.</p>
+        </div>
       </form>
-      <p className="mt-3 text-xs text-ink-500">Se crea vacío. Después registrás las parejas y revisás el reparto antes de generar.</p>
       {createError && <Alert>{createError}</Alert>}
     </Card>
-    {loadError && <Alert>{loadError}</Alert>}
+    {loadError || uncertain ? <div className="space-y-2">
+      <Alert>{loadError ?? 'La creación pudo haberse guardado. Consultá el historial antes de intentar crear de nuevo.'}</Alert>
+      <Button variant="secondary" disabled={loading || saving} onClick={() => setReload(n => n + 1)}>Volver a consultar eventos</Button>
+    </div> : null}
     <Card>
       {loading ? <Spinner label="Cargando eventos…" /> : loadError ? <EmptyState>No se pudo consultar el historial. Recargá la lista.</EmptyState> : !events.length ? <EmptyState>Todavía no hay Americanos. Creá el primer borrador.</EmptyState> :
-        <Table head={<tr><Th>Evento</Th><Th>Estado</Th><Th>Parejas / zonas</Th><Th>Grupos guardados</Th><Th>Acceso</Th></tr>}>
+        <Table head={<tr><Th>Evento</Th><Th>Estado</Th><Th>Parejas / zonas</Th><Th>Campeones</Th><Th>Acceso</Th></tr>}>
           {events.map((event) => <tr key={event.id} className="hover:bg-ink-50">
             <Td><span className="font-medium text-ink-900">{event.name}</span><p className="text-xs text-ink-500">#{event.id} · {stages[event.start_stage]}</p></Td>
             <Td>{states[event.state]}</Td><Td className="tabular-nums">{event.registration_count} / {event.zone_count}</Td>
-            <Td className="tabular-nums">{event.saved_rounds} / {event.total_rounds}</Td>
+            <Td>{event.champion ? <span className="font-medium text-ink-900">{event.champion.player1_name} / {event.champion.player2_name}</span> : <span className="text-ink-500">—</span>}</Td>
             <Td><Button variant="secondary" onClick={() => onNavigate({ kind: 'event', event_id: event.id })}>{event.state === 'draft' ? 'Retomar evento' : 'Ver historial'}</Button></Td>
           </tr>)}
         </Table>}

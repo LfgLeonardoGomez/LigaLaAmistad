@@ -3,7 +3,7 @@ import type {
   AmericanoNavigation, AmericanoPlayoffsPageProps, EventDetail, KnockoutNode,
   DirtyNavigationDraft, PlayoffsResponse, QualifierSnapshot, SaveKnockoutRequest, Side, StartStage,
 } from '../../api/americano-types'
-import { Alert, Button, Card, Spinner } from '../../components/ui'
+import { Alert, Button, Card, Select, Spinner } from '../../components/ui'
 
 const stages: StartStage[] = ['quarterfinal', 'semifinal', 'final']
 const stageNames: Record<StartStage, string> = { quarterfinal: 'Cuartos', semifinal: 'Semifinal', final: 'Final' }
@@ -152,7 +152,7 @@ function sameSavedResult(node: KnockoutNode, draft: SetDraft) {
     Number(draft.games_a) === node.games_a && Number(draft.games_b) === node.games_b
 }
 function validTerminal(first: string, second: string) {
-  if (!/^\d+$/.test(first) || !/^\d+$/.test(second)) return false
+  if (!/^[0-7]$/.test(first) || !/^[0-7]$/.test(second)) return false
   const a = Number(first), b = Number(second)
   if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b)) return false
   return (a === 6 && b <= 4) || (b === 6 && a <= 4) || (a === 7 && (b === 5 || b === 6)) || (b === 7 && (a === 5 || a === 6))
@@ -173,10 +173,18 @@ function PlayoffsWorkstation({ initial, operations, onNavigate, onDirtyChange }:
   const [needsReconcile, setNeedsReconcile] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  const [courtAttempt, setCourtAttempt] = useState<{ nodeId: number; courtNumber: number } | null>(null)
   const lastAttempt = useRef<SetAttempt | null>(null)
   const active = useRef(true)
   const generation = useRef(0)
   const scoreInputs = useRef(new Map<string, HTMLInputElement>())
+  const saveButtons = useRef(new Map<number, HTMLButtonElement>())
+  const focusAfterSave = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    if (busyState || !focusAfterSave.current) return
+    scoreInputs.current.get(focusAfterSave.current)?.focus()
+    focusAfterSave.current = null
+  }, [current, busyState])
   const ports = useRef({ operations, onDirtyChange })
   useLayoutEffect(() => { ports.current = { operations, onDirtyChange } }, [operations, onDirtyChange])
   useLayoutEffect(() => {
@@ -219,12 +227,19 @@ function PlayoffsWorkstation({ initial, operations, onNavigate, onDirtyChange }:
     if (!active.current || busy.current || unresolved.current) return
     const selectedEditor = editorRef.current
     if (selectedEditor && selectedEditor.nodeId !== node.id && dirtyNow()) return
+    if (!/^[0-7]?$/.test(value)) { setSaveError('Usá un único dígito del 0 al 7 para los games.'); return }
     const base = selectedEditor?.nodeId === node.id ? selectedEditor : draftOf(node)
+    const previous = side === 'a' ? base.games_a : base.games_b
     updateEditor({ ...base, [side === 'a' ? 'games_a' : 'games_b']: value })
+    if (previous === '' && value !== '') {
+      if (side === 'a') scoreInputs.current.get(`${node.id}:b`)?.focus()
+      else requestAnimationFrame(() => saveButtons.current.get(node.id)?.focus())
+    }
   }
   function adopt(next: LoadedPlayoffs, keep: boolean) {
     currentRef.current = next
     setCurrent(next)
+    setCourtAttempt(null)
     if (!keep) { editorRef.current = null; setEditor(null) }
     comparisonRef.current = null
     setComparison(null)
@@ -306,6 +321,9 @@ function PlayoffsWorkstation({ initial, operations, onNavigate, onDirtyChange }:
       if (!active.current || generation.current !== started) return false
       checkPlayoffs(data, base.event)
       if (data.revision !== base.playoffs.revision + 1 || data.groups_revision !== base.playoffs.groups_revision || !matchesAttempt(data, attempt)) throw new Error('La respuesta no permite verificar este resultado.')
+      const next = [...data.nodes].sort((a, b) => stages.indexOf(a.stage) - stages.indexOf(b.stage) || a.slot - b.slot)
+        .find(candidate => candidate.id !== node.id && candidate.can_edit && !candidate.set_complete)
+      focusAfterSave.current = next ? `${next.id}:a` : null
       adopt({ event: base.event, playoffs: data }, false)
       setNotice('Resultado guardado.')
       return true
@@ -326,6 +344,36 @@ function PlayoffsWorkstation({ initial, operations, onNavigate, onDirtyChange }:
       if (active.current && generation.current === started) setBusy(false)
     }
   }
+  async function assignCourt(node: KnockoutNode, courtNumber: number) {
+    const assign = ports.current.operations.assignKnockoutCourt
+    if (!assign || !active.current || busy.current || unresolved.current || dirtyNow() || node.set_complete) return
+    const base = currentRef.current
+    const started = generation.current
+    busy.current = true
+    setBusy(true)
+    setSaveError(null)
+    setNotice('Guardando cancha…')
+    setCourtAttempt({ nodeId: node.id, courtNumber })
+    try {
+      const data = await assign(base.event.id, node.id, { expected_revision: base.playoffs.revision, court_number: courtNumber })
+      if (!active.current || generation.current !== started) return
+      checkPlayoffs(data, base.event)
+      if (data.revision !== base.playoffs.revision + 1 || data.groups_revision !== base.playoffs.groups_revision || data.nodes.find(candidate => candidate.id === node.id)?.court_number !== courtNumber) throw new Error('No se pudo verificar la cancha guardada.')
+      adopt({ event: { ...base.event, revision: data.revision }, playoffs: data }, false)
+      setNotice('Cancha actualizada.')
+    } catch (cause) {
+      if (!active.current || generation.current !== started) return
+      setSaveError(cause instanceof Error ? cause.message : 'No se pudo guardar la cancha.')
+      if (statusOf(cause) !== 422) {
+        unresolved.current = true
+        setNeedsReconcile(true)
+        await compareWithServer(null, started)
+      } else setCourtAttempt(null)
+    } finally {
+      if (active.current && generation.current === started) { busy.current = false; setBusy(false) }
+    }
+  }
+
   function discard() {
     if (!active.current || busy.current || (unresolved.current && !comparisonRef.current)) return false
     if (comparisonRef.current) adopt(comparisonRef.current, false)
@@ -391,17 +439,18 @@ function PlayoffsWorkstation({ initial, operations, onNavigate, onDirtyChange }:
     {needsReconcile ? <section aria-label="Comparación del cuadro" className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-ink-800">
       <h2 className="font-semibold">No se pudo verificar el guardado</h2>
       {comparison ? <>
-        <p>El cuadro guardado está en revisión {comparison.playoffs.revision}; tu edición sigue en el formulario.</p>
+        <p>El cuadro guardado está en revisión {comparison.playoffs.revision}. {courtAttempt ? 'Revisá la cancha guardada antes de volver a cambiarla.' : 'Tu edición sigue en el formulario.'}</p>
+        {courtAttempt ? <p>Cancha solicitada: {courtAttempt.courtNumber} · Cancha guardada: {comparison.playoffs.nodes.find(node => node.id === courtAttempt.nodeId)?.court_number ?? 'Sin asignar'}. No se reenvió el cambio.</p> : null}
         {canonicalNode ? <p>{nodeName(canonicalNode)}: {canonicalNode.registration_a ? pairName(canonicalNode.registration_a) : 'Participante pendiente'} · {canonicalNode.games_a ?? '—'} – {canonicalNode.games_b ?? '—'} · {canonicalNode.registration_b ? pairName(canonicalNode.registration_b) : 'Participante pendiente'}</p> : null}
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="secondary" disabled={busyState} onClick={() => { if (!busy.current && comparisonRef.current) { adopt(comparisonRef.current, false); setNotice('Se adoptó el cuadro guardado.') } }}>Usar cuadro guardado</Button>
-          <Button type="button" variant="secondary" disabled={busyState || !canKeep} onClick={() => {
+          {!courtAttempt ? <Button type="button" variant="secondary" disabled={busyState || !canKeep} onClick={() => {
             if (busy.current || !canKeep || !comparisonRef.current) return
             adopt(comparisonRef.current, true)
             setNotice('Edición conservada. Revisá el resultado y guardalo para reintentar.')
-          }}>Conservar mi edición</Button>
+          }}>Conservar mi edición</Button> : null}
         </div>
-        {!canKeep ? <p>Este resultado ya no admite correcciones.</p> : null}
+        {!canKeep && !courtAttempt ? <p>Este resultado ya no admite correcciones.</p> : null}
       </> : <p>Consultá el servidor antes de volver a guardar.</p>}
       <Button type="button" variant="secondary" disabled={busyState} onClick={() => void refresh()}>Volver a comprobar</Button>
     </section> : null}
@@ -427,10 +476,23 @@ function PlayoffsWorkstation({ initial, operations, onNavigate, onDirtyChange }:
               const canEnterScore = node.can_edit && Boolean(node.registration_a && node.registration_b)
               const draft = activeEditor ? editor : draftOf(node)
               const unchangedSavedResult = sameSavedResult(node, draft)
+              const invalidScore = Boolean(draft.games_a && draft.games_b && !validTerminal(draft.games_a, draft.games_b))
               return <article key={node.id} id={`americano-match-${node.id}`} aria-label={nodeName(node)} className="relative z-10 self-center px-1"
                 style={{ gridColumn: `${stageIndex * 2 + 1}`, gridRow: `${rowStart} / span ${rowsPerMatch}` }}>
                 <Card className="overflow-hidden p-0 shadow-sm">
                   <h3 className="border-b border-ink-200 bg-ink-50 px-3 py-2 text-xs font-semibold text-ink-700">{nodeName(node)}</h3>
+                  <div className="border-b border-ink-200 px-3 py-2">
+                    {operations.assignKnockoutCourt && !node.set_complete && playoffs.state === 'playoffs' ? <label className="flex items-center gap-2 text-xs text-ink-600">
+                      Cancha sugerida
+                      <Select aria-label={`Cancha de ${nodeName(node)}`} value={node.court_number ?? ''}
+                        disabled={busyState || needsReconcile || dirtyNow()}
+                        onChange={e => void assignCourt(node, Number(e.target.value))}>
+                        {!node.court_number ? <option value="" disabled>Sin asignar</option> : null}
+                        {playoffs.courts.map(court => <option key={court} value={court}>Cancha {court}</option>)}
+                      </Select>
+                    </label> : <p className="text-xs font-medium text-emerald-800">{node.court_number ? `Cancha ${node.court_number}` : 'Cancha sin asignar'}</p>}
+                    {!node.set_complete ? <p className="mt-1 text-[11px] text-ink-500">Según disponibilidad; pueden jugarse en distintos turnos.</p> : null}
+                  </div>
                   <div className="divide-y divide-ink-200">
                     {(['a', 'b'] as Side[]).map(side => {
                       const registration = side === 'a' ? node.registration_a : node.registration_b
@@ -439,7 +501,7 @@ function PlayoffsWorkstation({ initial, operations, onNavigate, onDirtyChange }:
                       const scoreValue = side === 'a' ? draft.games_a : draft.games_b
                       const winner = registration && node.winner_registration_id === registration.id
                       const inputKey = `${node.id}:${side}`
-                      return <div key={side} className={`grid grid-cols-[minmax(0,1fr)_3.25rem] items-center gap-2 px-3 py-2.5 ${winner ? 'bg-emerald-50/70' : 'bg-surface'}`}>
+                      return <div key={side} className={`grid grid-cols-[minmax(0,1fr)_3.5rem] items-center gap-2 px-3 py-2.5 ${winner ? 'bg-emerald-50/70' : 'bg-surface'}`}>
                         <div className="min-w-0">
                           <p className={`break-words text-sm ${winner ? 'font-semibold text-emerald-950' : 'text-ink-800'}`}>
                             {registration ? pairName(registration) : source ? `Ganador de ${nodeName(source)}` : 'Participante pendiente'}
@@ -448,19 +510,31 @@ function PlayoffsWorkstation({ initial, operations, onNavigate, onDirtyChange }:
                         </div>
                         {canEnterScore ? <input
                           ref={element => { if (element) scoreInputs.current.set(inputKey, element); else scoreInputs.current.delete(inputKey) }}
-                          type="text" inputMode="numeric" maxLength={2} autoComplete="off"
+                          type="text" inputMode="numeric" pattern="[0-7]" maxLength={1} autoComplete="off"
                           aria-label={`Games de ${registration ? pairName(registration) : `lado ${side.toUpperCase()}`} · ${nodeName(node)}`}
-                          aria-invalid={activeEditor && Boolean(saveError)} aria-describedby={activeEditor && saveError ? `score-error-${node.id}` : undefined}
+                          aria-invalid={activeEditor && (invalidScore || Boolean(saveError))} aria-describedby={`score-error-${node.id}`}
                           disabled={busyState || needsReconcile || otherDraftBlocks} value={scoreValue}
                           onFocus={event => event.currentTarget.select()}
                           onChange={event => changeScore(node, side, event.currentTarget.value)}
-                          className="h-11 w-full rounded-md border border-ink-300 bg-surface text-center text-xl font-semibold tabular-nums text-ink-900 focus-visible:outline-2 focus-visible:outline-ink-800 disabled:bg-ink-50" />
+                          onPaste={event => { event.preventDefault(); changeScore(node, side, event.clipboardData.getData('text')) }}
+                          onKeyDown={event => {
+                            if (event.key === 'Backspace' || event.key === 'Delete') { event.preventDefault(); changeScore(node, side, '') }
+                            if (event.key === 'Enter') {
+                              event.preventDefault()
+                              if (side === 'a') scoreInputs.current.get(`${node.id}:b`)?.focus()
+                              else void persist(node.id)
+                            }
+                          }}
+                          className={`h-14 w-14 rounded-md border bg-surface text-center text-2xl font-semibold tabular-nums text-ink-900 outline-none focus:ring-2 focus:ring-ink-800 focus:ring-offset-2 disabled:bg-ink-50 ${invalidScore ? 'border-red-600' : 'border-ink-300'}`} />
                           : <span aria-label={`Games lado ${side.toUpperCase()}`} className="text-center text-xl font-semibold tabular-nums text-ink-900">{score ?? '—'}</span>}
                       </div>
                     })}
                   </div>
+                  {canEnterScore ? <p id={`score-error-${node.id}`} className={invalidScore ? 'px-3 py-2 text-xs text-red-700' : 'sr-only'}>
+                    {invalidScore ? 'Resultado inválido. Usá 6-0 a 6-4, 7-5 o 7-6, o sus inversos.' : 'Un dígito por casillero, del 0 al 7. Al completar el resultado, guardá para continuar al siguiente partido.'}
+                  </p> : null}
                   {canEnterScore ? <div className="flex items-center gap-2 border-t border-ink-200 px-3 py-2.5">
-                    <Button type="button" disabled={busyState || needsReconcile || otherDraftBlocks || unchangedSavedResult}
+                    <Button ref={element => { if (element) saveButtons.current.set(node.id, element); else saveButtons.current.delete(node.id) }} type="button" disabled={busyState || needsReconcile || otherDraftBlocks || unchangedSavedResult || !validTerminal(draft.games_a, draft.games_b)}
                       onClick={() => void persist(node.id)}>
                       {busyState && activeEditor ? 'Guardando…' : unchangedSavedResult ? 'Guardado' : node.set_complete ? 'Guardar corrección' : 'Guardar resultado'}
                     </Button>

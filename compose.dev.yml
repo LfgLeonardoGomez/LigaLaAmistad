@@ -1,0 +1,21 @@
+# Isolated database for Americanos manual testing; API/Vite run natively in dev.
+# No images of this application are built and no production .env is read here.
+name: liga-americanos-dev
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: liga_dev
+      POSTGRES_PASSWORD: liga-local-only
+      POSTGRES_DB: liga_americanos_dev
+    ports:
+      - "127.0.0.1:5544:5432"
+    volumes:
+      - americanos-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U liga_dev -d liga_americanos_dev"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  americanos-dev-data:

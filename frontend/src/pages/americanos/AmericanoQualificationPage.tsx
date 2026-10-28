@@ -89,7 +89,7 @@ function QualificationReview({ eventId, operations, onNavigate }: AmericanoQuali
   const needsHumanResolution = Boolean(preview?.slots.some(slot => slot.requires_resolution) && (!complete || dirty))
   const hasResolutionSlots = Boolean(preview?.slots.some(slot => slot.requires_resolution))
   const canOpenTieDialog = Boolean(preview && hasResolutionSlots && !disabled && preview.state === 'review' &&
-    preview.seeding_template.status === 'approved' && preview.missing_slots.length === 0 &&
+    preview.seeding_template.status === 'approved' &&
     preview.blockers.every(blocker => blocker.code === 'unresolved_ties'))
 
   async function compareCanonical(started: number) {
@@ -186,6 +186,7 @@ function QualificationReview({ eventId, operations, onNavigate }: AmericanoQuali
     <Button type="button" variant="secondary" onClick={() => onNavigate({ kind: 'list' })}>Volver a Americanos</Button></div>
   const pairs = new Map(review.event.registrations.map(pair => [pair.id, `${pair.player1_name} / ${pair.player2_name} · #${pair.registration_order}`]))
   const qualifiedIds = new Set(preview.slots.flatMap(slot => slot.registration_id === null ? [] : [slot.registration_id]))
+  const qualifiedPositions = new Map(preview.slots.flatMap(slot => slot.registration_id === null ? [] : [[slot.registration_id, slot.position] as const]))
   const canonicalChanged = canonical && (canonical.preview.revision !== preview.revision || canonical.preview.source_groups_revision !== preview.source_groups_revision)
   const primaryDisabled = pending || recovery || retryRequest !== null ||
     (!preview.frozen && !canConfirm && !canOpenTieDialog)
@@ -197,10 +198,10 @@ function QualificationReview({ eventId, operations, onNavigate }: AmericanoQuali
     {preview.standings.map(zone => <section key={zone.zone.id} aria-label={`Clasificación zona ${zone.zone.label}`}>
       <h2 className="mb-3 text-sm font-semibold text-ink-800">Zona {zone.zone.label}</h2>
       <Card><Table head={<tr><Th>Pos.</Th><Th>Pareja</Th><Th className="text-right">Puntos</Th><Th className="text-right">Dif. games</Th></tr>}>
-        {zone.blocks.flatMap(block => block.rows.map(row => {
+        {zone.blocks.flatMap(block => [...block.rows].sort((a, b) => (qualifiedPositions.get(a.registration.id) ?? Number.MAX_SAFE_INTEGER) - (qualifiedPositions.get(b.registration.id) ?? Number.MAX_SAFE_INTEGER)).map(row => {
           const qualified = qualifiedIds.has(row.registration.id)
           return <tr key={row.registration.id} className={qualified ? 'bg-emerald-50' : undefined}>
-          <Td className="tabular-nums">{block.position_from === block.position_to ? block.position_from : `${block.position_from}–${block.position_to}`}</Td>
+          <Td className="tabular-nums">{qualifiedPositions.get(row.registration.id) ?? (block.position_from === block.position_to ? block.position_from : `${block.position_from}–${block.position_to}`)}</Td>
           <Td><span className={qualified ? 'font-semibold text-emerald-900' : undefined}>{pairs.get(row.registration.id)}</span>
             {qualified ? <span className="ml-2 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Clasificado</span> : null}</Td>
           <Td className="text-right tabular-nums">{(row.points_half_units / 2).toLocaleString('es-AR')}</Td>
@@ -209,6 +210,13 @@ function QualificationReview({ eventId, operations, onNavigate }: AmericanoQuali
         }))}
       </Table></Card>
     </section>)}
+    {hasResolutionSlots && !preview.frozen ? <section aria-label="Desempates de clasificación" className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+      <h2 className="font-semibold text-ink-900">{needsHumanResolution ? 'Hay puestos empatados por resolver' : 'Desempates guardados'}</h2>
+      <p className="text-sm text-ink-700">Si dos parejas tienen los mismos puntos y diferencia de games, elegí su orden para definir los puestos y los cruces. No se desempata automáticamente.</p>
+      <Button type="button" disabled={!canOpenTieDialog} onClick={() => { if (canOpenTieDialog) setTieDialogOpen(true) }}>
+        {needsHumanResolution ? 'Resolver empates' : 'Revisar desempates'}
+      </Button>
+    </section> : null}
     {error ? <Alert>{error}</Alert> : null}
     {recovery ? <section className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4" aria-label="Recuperación de clasificación">
       {canonical ? <><p className="text-sm text-ink-700">La revisión guardada cambió. Cargá la versión actual para continuar.</p>
@@ -282,7 +290,7 @@ function TieResolutionDialog({
     onCancel={event => { event.preventDefault(); onClose() }}
     className="m-auto w-full max-w-lg rounded-lg border border-ink-200 bg-surface p-6 text-ink-800 shadow-xl backdrop:bg-black/40">
     <h2 id="tie-resolution-title" className="text-lg font-semibold text-ink-900">Resolver empates</h2>
-    <p className="mt-1 text-sm text-ink-600">Elegí quién clasifica en cada empate.</p>
+    <p className="mt-1 text-sm text-ink-600">Elegí quién ocupa cada puesto empatado. Una pareja no puede ocupar dos puestos.</p>
     <div className="mt-4 space-y-3">
       {tiedSlots.map(slot => {
         const zone = preview.standings.find(value => value.zone.id === slot.zone_id)?.zone
@@ -305,7 +313,7 @@ function TieResolutionDialog({
     {dirty && !complete ? <p className="mt-3 text-sm text-amber-700">Elegí una pareja en cada empate.</p> : null}
     {notice ? <p role="status" aria-live="polite" className="mt-3 text-sm text-ink-600">{notice}</p> : null}
     <div className="mt-5 flex flex-wrap gap-2">
-      <Button type="button" disabled={pending || !dirty || !complete} onClick={onSave}>Guardar sorteo</Button>
+      <Button type="button" disabled={pending || !dirty || !complete} onClick={onSave}>Guardar desempates</Button>
       <Button type="button" disabled={pending || !canConfirm} onClick={onConfirm}>Iniciar playoffs</Button>
       <Button type="button" variant="secondary" disabled={pending} onClick={onClose}>Volver</Button>
     </div>

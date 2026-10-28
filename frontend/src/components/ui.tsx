@@ -2,6 +2,7 @@ import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
+  Ref,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react'
@@ -17,6 +18,7 @@ const BUTTON_STYLES: Record<ButtonVariant, string> = {
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
+  ref?: Ref<HTMLButtonElement>
 }
 
 export function Button({ variant = 'primary', className = '', ...props }: ButtonProps) {

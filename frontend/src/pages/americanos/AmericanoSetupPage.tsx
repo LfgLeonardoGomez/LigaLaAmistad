@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { AmericanoSetupPageProps, EventDetail, Registration, StartStage, ZoneCount } from '../../api/americano-types'
 import { Alert, Button, Card, EmptyState, Field, Input, PageHeader, Select, Spinner } from '../../components/ui'
+import { CourtSelector } from './CourtSelector'
+import { SetupSteps } from './SetupSteps'
+import { GenerateFixtureDialog } from './GenerateFixtureDialog'
 
 const stages = { quarterfinal: 'Cuartos de final', semifinal: 'Semifinales', final: 'Final' }
 const states = { draft: 'Borrador', groups: 'Grupos', review: 'Revisión', playoffs: 'Playoffs', completed: 'Finalizado' }
@@ -29,6 +32,7 @@ function SetupLoader({ eventId, operations, onNavigate }: AmericanoSetupPageProp
   const [canonical, setCanonical] = useState<EventDetail | null>(null)
   const [additionUncertain, setAdditionUncertain] = useState(false)
   const [editorVersion, setEditorVersion] = useState(0)
+  const [step, setStep] = useState(2)
   const inFlight = useRef(false)
   const generation = useRef(0)
   const initialized = useRef(false)
@@ -44,6 +48,11 @@ function SetupLoader({ eventId, operations, onNavigate }: AmericanoSetupPageProp
     setBlocked(false)
     setError(null)
     setNotice('Fixture generado. Configuración bloqueada.')
+    if (next.state === 'groups' && next.total_rounds > 0) {
+      onNavigate({ kind: 'round', event_id: next.id, round_number: 1 })
+    } else if (next.state === 'review') {
+      onNavigate({ kind: 'qualification', event_id: next.id })
+    } else onNavigate({ kind: 'event', event_id: next.id })
   }
 
   useEffect(() => {
@@ -82,11 +91,12 @@ function SetupLoader({ eventId, operations, onNavigate }: AmericanoSetupPageProp
     try {
       const next = await job()
       if (generation.current !== started) return false
+      if (kind === 'generated') { adoptGenerated(next); return true }
       setEvent(next)
       setEditorVersion((version) => version + 1)
       setAdditionUncertain(false)
       generationUncertain.current = false
-      setNotice(kind === 'generated' ? 'Fixture generado. Configuración bloqueada.' : 'Cambios guardados.')
+      setNotice('Cambios guardados.')
       return true
     } catch (cause) {
       if (generation.current === started) {
@@ -155,16 +165,19 @@ function SetupLoader({ eventId, operations, onNavigate }: AmericanoSetupPageProp
     {loading && <Spinner label="Cargando evento…" />}
     {event ?
       <SetupEditor key={editorVersion} event={event} operations={operations}
+        step={step} setStep={setStep}
         onNavigate={onNavigate} eventId={eventId} mutate={mutate} disabled={loading || pending || blocked}
         recovery={{ canonical, additionUncertain, useServer: () => { acceptCanonical(false) }, keep: () => acceptCanonical(true) }} /> :
       !loading && <EmptyState>No se pudo abrir el evento. Usá Recargar evento.</EmptyState>}
   </div>
 }
 
-function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery }: AmericanoSetupPageProps & { event: EventDetail; mutate: Mutate; disabled: boolean; recovery: Recovery }) {
+function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery, step, setStep }: AmericanoSetupPageProps & { event: EventDetail; mutate: Mutate; disabled: boolean; recovery: Recovery; step: number; setStep: (step: number) => void }) {
   const [name, setName] = useState(event.name)
   const [zoneCount, setZoneCount] = useState(event.zone_count)
   const [stage, setStage] = useState(event.start_stage)
+  const [generationDialog, setGenerationDialog] = useState(false)
+  const [courts, setCourts] = useState(event.courts)
   const [editing, setEditing] = useState<Registration | null>(null)
   const pairSequence = useRef(1)
   const [pairRows, setPairRows] = useState<PairDraft[]>([{ key: 0, player1: '', player2: '' }])
@@ -172,7 +185,7 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
   const [selected, setSelected] = useState(() => new Set(event.registrations.filter((r) => r.zone_id === zoneA?.id).map((r) => r.id)))
   const frozen = event.state !== 'draft'
   const locked = disabled || frozen
-  const configDirty = name !== event.name || zoneCount !== event.zone_count || stage !== event.start_stage
+  const configDirty = name !== event.name || zoneCount !== event.zone_count || stage !== event.start_stage || courts.join(',') !== event.courts.join(',')
   const pairDirty = editing !== null || pairRows.length > 1 || pairRows.some((row) => row.player1 !== '' || row.player2 !== '')
   const zonesDirty = event.registrations.some((r) => selected.has(r.id) !== (r.zone_id === zoneA?.id))
   const revision = { expected_revision: event.revision }
@@ -207,6 +220,7 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
     if (!dirtyName) setName(canonical.name)
     if (!dirtyZoneCount) setZoneCount(canonical.zone_count)
     if (!dirtyStage) setStage(canonical.start_stage)
+    if (courts.join(',') === event.courts.join(',')) setCourts(canonical.courts)
     if (editing && canonicalPair) setEditing(canonicalPair)
     const canonicalZoneA = canonical.zones.find((zone) => zone.label === 'A')
     setSelected(new Set(canonical.registrations.filter((r) => r.zone_id === canonicalZoneA?.id).map((r) => r.id)))
@@ -218,9 +232,9 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
   }
   function saveConfiguration(e: FormEvent) {
     e.preventDefault()
-    if (locked || !configDirty || !name.trim() || pairDirty || zonesDirty) return
+    if (locked || !configDirty || !name.trim() || !courts.length || pairDirty || zonesDirty) return
     void mutate(() => operations.updateEvent(event.id, {
-      ...revision, name: name.trim(), zone_count: zoneCount, start_stage: stage,
+      ...revision, name: name.trim(), zone_count: zoneCount, start_stage: stage, courts,
     }))
   }
   function toggleZoneA(id: number) {
@@ -261,13 +275,20 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
     void mutate(() => operations.clearZones!(event.id, revision))
   }
   function generateFixture() {
+    if (!operations.generateFixture || locked || dirty || !event.can_generate) return
+    setGenerationDialog(true)
+  }
+  function confirmGeneration() {
     const generate = operations.generateFixture
-    if (!generate || locked || dirty || !event.can_generate) return
-    if (!window.confirm('Generar el fixture es irreversible: se bloquean nombres, parejas, zonas y etapa. No se puede regenerar. ¿Querés continuar?')) return
+    if (!generationDialog || !generate || locked || dirty || !event.can_generate) return
+    setGenerationDialog(false)
     void mutate(async () => (await generate(event.id, revision)).event, 'generated')
   }
 
   return <>
+    {generationDialog ? <GenerateFixtureDialog name={event.name} pairCount={event.registrations.length} courts={event.courts} hasRounds={event.zones.some(zone => event.registrations.filter(pair => pair.zone_id === zone.id).length >= 2)} onClose={() => setGenerationDialog(false)} onConfirm={confirmGeneration} /> : null}
+    <SetupSteps current={step} onChange={setStep} canVisit={(target) => !disabled && !dirty && (target < 3 || event.registrations.length > 0)} />
+    {dirty && <p role="status" className="text-sm text-amber-700">Guardá o descartá los cambios de este paso antes de cambiar de paso.</p>}
     {recovery.additionUncertain && <Alert tone="info">La incorporación pudo haberse guardado. Revisá las parejas guardadas antes de volver a agregar: conservar la edición no reenvía nada. Los nombres repetidos son válidos; un nuevo envío explícito puede crear otra pareja.</Alert>}
     {canonical && <section aria-label="Datos guardados del evento" className="space-y-3 rounded-md border border-ink-200 bg-ink-50 p-4">
       <h2 className="font-semibold text-ink-900">Datos guardados del evento</h2>
@@ -297,10 +318,11 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
         <Button variant="secondary" disabled={disabled} onClick={() => onNavigate({ kind: 'event', event_id: event.id })}>Continuar evento</Button>
       </div>
     </section>}
+    <section hidden={step !== 1} aria-label="Paso 1: Configuración">
     <Card className="p-5">
       <h2 className="mb-4 font-semibold text-ink-900">01 · Configuración</h2>
       {!frozen ? <form onSubmit={saveConfiguration}>
-        <fieldset disabled={locked || pairDirty || zonesDirty} className="grid items-end gap-4 lg:grid-cols-[2fr_1fr_1fr_auto]">
+        <fieldset disabled={locked || pairDirty || zonesDirty} className="grid items-end gap-4 lg:grid-cols-[2fr_1fr_1fr]">
           <Field label="Nombre del evento"><Input required value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="Cantidad de zonas">
             <Select value={zoneCount} onChange={(e) => setZoneCount(Number(e.target.value) as ZoneCount)}>
@@ -312,13 +334,15 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
               {Object.entries(stages).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </Select>
           </Field>
-          <Button type="submit" disabled={!configDirty || !name.trim()}>Guardar configuración</Button>
         </fieldset>
-      </form> : <p className="text-sm text-ink-700">{event.name} · {event.zone_count === 1 ? 'Una zona' : 'Dos zonas'} · {stages[event.start_stage]}</p>}
-      {configDirty && <Button variant="ghost" disabled={disabled} onClick={() => { setName(event.name); setZoneCount(event.zone_count); setStage(event.start_stage) }}>Descartar configuración</Button>}
+        <div className="mt-5"><CourtSelector value={courts} onChange={setCourts} disabled={locked || pairDirty || zonesDirty} /></div>
+        <Button className="mt-5" type="submit" disabled={locked || pairDirty || zonesDirty || !configDirty || !name.trim() || !courts.length}>Guardar configuración</Button>
+      </form> : <p className="text-sm text-ink-700">{event.name} · {event.zone_count === 1 ? 'Una zona' : 'Dos zonas'} · {stages[event.start_stage]} · Canchas {event.courts.join(', ')}</p>}
+      {configDirty && <Button variant="ghost" disabled={disabled} onClick={() => { setName(event.name); setZoneCount(event.zone_count); setStage(event.start_stage); setCourts(event.courts) }}>Descartar configuración</Button>}
       <p className="mt-3 text-xs text-ink-500">Cuartos: 8 clasificados · Semifinales: 4 · Final: 2. En dos zonas, mitad del cupo en cada una. Las seis plantillas de cruces están aprobadas.</p>
     </Card>
-    <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+    </section>
+    <section hidden={step !== 2} aria-label="Paso 2: Parejas">
       <Card className="p-5">
         <h2 className="mb-4 font-semibold text-ink-900">02 · Parejas <span className="text-ink-500 tabular-nums">({event.registrations.length})</span></h2>
         {!frozen && <form onSubmit={savePair}>
@@ -358,6 +382,8 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
           })}
         </ul>}
       </Card>
+    </section>
+    <section hidden={step !== 3} aria-label="Paso 3: Zonas">
       <Card className="p-5">
         <h2 className="mb-2 font-semibold text-ink-900">03 · Reparto y vista previa</h2>
         <p className="mb-4 text-sm text-ink-600">{event.zone_count === 1 ? 'Todas las parejas pertenecen a Zona A.' : 'Seleccioná las parejas que van a la zona A.'}</p>
@@ -393,15 +419,28 @@ function SetupEditor({ event, operations, onNavigate, mutate, disabled, recovery
           </section>)}
         </div>
       </Card>
-    </div>
+    </section>
+    <section hidden={step !== 4} aria-label="Paso 4: Fixture">
     <Card className="space-y-4 p-5">
       <h2 className="font-semibold text-ink-900">04 · Generar fixture</h2>
-      <p className="text-sm text-ink-600">Todos contra todos dentro de cada zona, hasta seis partidos por ronda global y descansos explícitos. Sin partidos, la continuación abre revisión de clasificados.</p>
+      <dl className="grid gap-3 rounded-md bg-ink-50 p-4 text-sm sm:grid-cols-2">
+        <div><dt className="text-ink-500">Evento</dt><dd className="font-medium text-ink-900">{event.name}</dd></div>
+        <div><dt className="text-ink-500">Parejas y zonas</dt><dd>{event.registrations.length} parejas · {event.zone_count} {event.zone_count === 1 ? 'zona' : 'zonas'}</dd></div>
+        <div><dt className="text-ink-500">Canchas</dt><dd>{event.courts.join(', ')} · Hasta {event.courts.length} partidos por ronda</dd></div>
+        <div><dt className="text-ink-500">Eliminatorias desde</dt><dd>{stages[event.start_stage]}</dd></div>
+      </dl>
+      <p className="text-sm text-ink-600">Todos contra todos dentro de cada zona. Los cruces se distribuyen en rondas según las canchas elegidas, con su número real y las parejas libres indicadas. En eliminatorias la cancha sugerida se puede ajustar según disponibilidad.</p>
       {event.configuration_issues.length > 0 && <Alert><ul>{event.configuration_issues.map((issue, i) => <li key={`${issue.code}:${issue.zone_id}:${i}`}>{issue.message}</li>)}</ul></Alert>}
       {dirty && <p className="text-sm text-amber-700">Guardá o descartá la edición activa antes de continuar. La vista previa usa la configuración guardada.</p>}
-      {!frozen && <p className="text-sm text-ink-700">Alcance aprobado: generar bloquea nombres, parejas, zonas y etapa. No permite regenerar.</p>}
+      {!frozen && <p className="text-sm text-ink-700">Al generar se bloquean la configuración, las canchas y las parejas. No se puede regenerar.</p>}
       {!operations.generateFixture && <p id="fixture-next-cut" className="text-sm text-ink-600">Generación no implementada en este corte; disponible en un próximo corte aunque los cupos sean suficientes.</p>}
       {!frozen && <Button aria-describedby={!operations.generateFixture ? 'fixture-next-cut' : undefined} disabled={!operations.generateFixture || locked || dirty || !event.can_generate} onClick={generateFixture}>Generar fixture</Button>}
     </Card>
+    </section>
+    <div className="flex items-center justify-between gap-3 border-t border-ink-200 pt-4">
+      <Button variant="secondary" disabled={disabled || dirty || step === 1} onClick={() => setStep(step - 1)}>Anterior</Button>
+      <span className="text-xs text-ink-500">Paso {step} de 4</span>
+      {step < 4 ? <Button disabled={disabled || dirty || (step >= 2 && !event.registrations.length)} onClick={() => setStep(step + 1)}>{step === 3 ? 'Revisar fixture' : 'Siguiente'}</Button> : <span />}
+    </div>
   </>
 }

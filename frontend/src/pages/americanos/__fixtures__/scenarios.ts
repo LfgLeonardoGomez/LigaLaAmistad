@@ -23,6 +23,8 @@ const p13: Registration = { id: 13, zone_id: 202, player1_name: 'Fede', player2_
 const p14: Registration = { id: 14, zone_id: 202, player1_name: 'Rita', player2_name: 'Noa', registration_order: 14 }
 
 export const draftEvent: EventDetail = {
+  champion: null,
+  courts: [1, 2, 3, 4, 5, 6],
   id: 101, name: 'Borrador vacío', state: 'draft', zone_count: 1, start_stage: 'semifinal',
   revision: 1, groups_revision: 0, registration_count: 0, total_rounds: 0, saved_rounds: 0,
   max_unlocked_round: 0, continuation: { kind: 'setup' }, zones: [zoneA], registrations: [],
@@ -42,13 +44,13 @@ export const emptyRound: RoundResponse = {
   zones: [zoneA], resting: [], matches: [
     { id: 301, zone_id: 201, display_order: 1, registration_a: p1, registration_b: p4, games_a: null, games_b: null },
     { id: 302, zone_id: 201, display_order: 2, registration_a: p2, registration_b: p3, games_a: null, games_b: null },
-  ],
+  ].map(match => ({ ...match, court_number: match.display_order })),
 }
 export const zeroZeroRound: RoundResponse = {
   ...emptyRound, revision: 3, groups_revision: 1, saved: true, max_unlocked_round: 2, matches: [
-    { id: 301, zone_id: 201, display_order: 1, registration_a: p1, registration_b: p4, games_a: 0, games_b: 0 },
-    { id: 302, zone_id: 201, display_order: 2, registration_a: p2, registration_b: p3, games_a: 0, games_b: 0 },
-  ],
+    { id: 301, zone_id: 201, display_order: 1, registration_a: p1, registration_b: p4, games_a: 0 as const, games_b: 0 as const },
+    { id: 302, zone_id: 201, display_order: 2, registration_a: p2, registration_b: p3, games_a: 0 as const, games_b: 0 as const },
+  ].map(match => ({ ...match, court_number: match.display_order })),
 }
 export const sixMatchesRound: RoundResponse = {
   ...emptyRound, event_id: 103, event_name: 'Dos zonas de siete', total_rounds: 7, zones: [zoneA, zoneB],
@@ -59,7 +61,7 @@ export const sixMatchesRound: RoundResponse = {
     { id: 314, zone_id: 202, display_order: 4, registration_a: p8, registration_b: p9, games_a: null, games_b: null },
     { id: 315, zone_id: 202, display_order: 5, registration_a: p10, registration_b: p11, games_a: null, games_b: null },
     { id: 316, zone_id: 202, display_order: 6, registration_a: p12, registration_b: p13, games_a: null, games_b: null },
-  ], resting: [{ registration: p7, reason: 'bye' }, { registration: p14, reason: 'bye' }],
+  ].map(match => ({ ...match, court_number: match.display_order })), resting: [{ registration: p7, reason: 'bye' }, { registration: p14, reason: 'bye' }],
 }
 export const byesRound: RoundResponse = { ...sixMatchesRound }
 export const elevenFieldsDraft: RoundDraftRow[] = [
@@ -131,6 +133,7 @@ export const resolvedReview: QualificationResponse = {
   ],
 }
 export const bracket: PlayoffsResponse = {
+  courts: [1, 2, 3, 4, 5, 6],
   event_id: 102, event_name: 'Americano de cuatro', state: 'playoffs', revision: 7, groups_revision: 3,
   start_stage: 'semifinal', zones: [zoneA], champion: null, snapshots: [
     { zone_id: 201, position: 1, registration_id: 2, player1_name: 'Eva', player2_name: 'Sol', points_half_units: 3, games_diff: 0, source_groups_revision: 3 },
@@ -138,9 +141,9 @@ export const bracket: PlayoffsResponse = {
     { zone_id: 201, position: 3, registration_id: 4, player1_name: 'Paz', player2_name: 'Mar', points_half_units: 3, games_diff: 0, source_groups_revision: 3 },
     { zone_id: 201, position: 4, registration_id: 3, player1_name: 'Leo', player2_name: 'Juan', points_half_units: 3, games_diff: 0, source_groups_revision: 3 },
   ], nodes: [
-    { id: 401, stage: 'semifinal', slot: 1, registration_a: p2, registration_b: p3, games_a: null, games_b: null, set_complete: false, next_match_id: 403, next_side: 'a', winner_registration_id: null, can_edit: true, edit_block_reason: null },
-    { id: 402, stage: 'semifinal', slot: 2, registration_a: p1, registration_b: p4, games_a: null, games_b: null, set_complete: false, next_match_id: 403, next_side: 'b', winner_registration_id: null, can_edit: true, edit_block_reason: null },
-    { id: 403, stage: 'final', slot: 1, registration_a: null, registration_b: null, games_a: null, games_b: null, set_complete: false, next_match_id: null, next_side: null, winner_registration_id: null, can_edit: false, edit_block_reason: 'participants_pending' },
+    { id: 401, stage: 'semifinal', slot: 1, court_number: 1, registration_a: p2, registration_b: p3, games_a: null, games_b: null, set_complete: false, next_match_id: 403, next_side: 'a', winner_registration_id: null, can_edit: true, edit_block_reason: null },
+    { id: 402, stage: 'semifinal', slot: 2, court_number: 2, registration_a: p1, registration_b: p4, games_a: null, games_b: null, set_complete: false, next_match_id: 403, next_side: 'b', winner_registration_id: null, can_edit: true, edit_block_reason: null },
+    { id: 403, stage: 'final', slot: 1, court_number: 1, registration_a: null, registration_b: null, games_a: null, games_b: null, set_complete: false, next_match_id: null, next_side: null, winner_registration_id: null, can_edit: false, edit_block_reason: 'participants_pending' },
   ],
 }
 export const snapshot: ConfirmationResponse = {

@@ -58,6 +58,8 @@ export const americanoPlayoffsReadOperations: AmericanoPlayoffsReadOperations = 
 
 export const americanoPlayoffsOperations: AmericanoPlayoffsOperations = {
   ...americanoPlayoffsReadOperations,
+  assignKnockoutCourt: (eventId, nodeId, request) =>
+    api.put<PlayoffsResponse>(`${collection}/${eventId}/playoffs/${nodeId}/court`, request),
   saveKnockout: (eventId, nodeId, request) =>
     api.put<PlayoffsResponse>(`${collection}/${eventId}/playoffs/${nodeId}/result`, request),
 }
