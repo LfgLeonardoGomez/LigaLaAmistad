@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, UploadFile, status
 
 from app.auth.deps import get_current_admin
 from app.core.config import settings
+from app.core.csrf import require_same_origin
 from app.core.images import upload_image
 from app.database.session import SessionDep
 from app.teams import service
@@ -10,7 +11,7 @@ from app.teams.schemas import TeamCreate, TeamRead, TeamUpdate
 router = APIRouter(
     prefix="/admin/teams",
     tags=["admin: teams"],
-    dependencies=[Depends(get_current_admin)],
+    dependencies=[Depends(get_current_admin), Depends(require_same_origin)],
 )
 
 

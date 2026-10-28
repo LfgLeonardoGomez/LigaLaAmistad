@@ -12,7 +12,9 @@ from app.americanos.models import (
     AmericanoEvent, AmericanoEventState, AmericanoGroupMatch, AmericanoRegistration,
     AmericanoRound, AmericanoZone,
 )
-from app.americanos.schemas import EventDetail, GenerateFixtureResponse, ListEventsResponse
+from app.americanos.schemas import (
+    MAX_BULK_REGISTRATIONS, EventDetail, GenerateFixtureResponse, ListEventsResponse,
+)
 
 from .americano_fixtures import BASE, add_registration, americano_api, create_event  # noqa: F401
 
@@ -410,6 +412,53 @@ def test_bulk_registration_adds_multiple_pairs_in_one_revision(americano_api, zo
         assert all(r["zone_id"] == updated["zones"][0]["id"] for r in updated["registrations"])
     else:
         assert all(r["zone_id"] is None for r in updated["registrations"])
+
+
+def test_bulk_registration_over_limit_is_rejected_without_partial_mutation(americano_api):
+    api = americano_api
+    detail = create_event(api)
+    response = api.client.post(f"{BASE}/{detail['id']}/registrations/bulk", json={
+        "expected_revision": detail["revision"],
+        "registrations": [
+            {"player1_name": f"P{i}", "player2_name": f"Q{i}"}
+            for i in range(MAX_BULK_REGISTRATIONS + 1)
+        ],
+    })
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+    assert api.client.get(f"{BASE}/{detail['id']}").json() == detail
+    with Session(api.engine) as session:
+        assert session.exec(select(AmericanoRegistration).where(
+            AmericanoRegistration.event_id == detail["id"],
+        )).all() == []
+
+
+def test_bulk_registration_can_continue_in_revisioned_chunks(americano_api):
+    api = americano_api
+    detail = create_event(api)
+    registrations = [
+        {"player1_name": f"P{i}", "player2_name": f"Q{i}"}
+        for i in range(MAX_BULK_REGISTRATIONS + 2)
+    ]
+
+    first = api.client.post(f"{BASE}/{detail['id']}/registrations/bulk", json={
+        "expected_revision": detail["revision"],
+        "registrations": registrations[:MAX_BULK_REGISTRATIONS],
+    })
+    assert first.status_code == 201, first.text
+    second = api.client.post(f"{BASE}/{detail['id']}/registrations/bulk", json={
+        "expected_revision": first.json()["revision"],
+        "registrations": registrations[MAX_BULK_REGISTRATIONS:],
+    })
+
+    assert second.status_code == 201, second.text
+    updated = second.json()
+    assert updated["revision"] == detail["revision"] + 2
+    assert len(updated["registrations"]) == MAX_BULK_REGISTRATIONS + 2
+    assert [item["registration_order"] for item in updated["registrations"]] == list(
+        range(1, MAX_BULK_REGISTRATIONS + 3)
+    )
 
 
 @pytest.mark.parametrize("assignment", ["manual", "random"])

@@ -17,8 +17,11 @@ from app.core.config import settings
 from app.americanos import models as americano_models  # noqa: F401,E402
 from app.auth import models as auth_models  # noqa: F401,E402
 from app.matches import models as match_models  # noqa: F401,E402
+from app.playoffs import models as playoff_models  # noqa: F401,E402
+from app.predictions import models as prediction_models  # noqa: F401,E402
 from app.sponsors import models as sponsor_models  # noqa: F401,E402
 from app.teams import models as team_models  # noqa: F401,E402
+from app.votes import models as vote_models  # noqa: F401,E402
 from app.zones import models as zone_models  # noqa: F401,E402
 
 config = context.config

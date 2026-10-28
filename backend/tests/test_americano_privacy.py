@@ -248,7 +248,7 @@ def test_draft_operations_leave_nonempty_league_and_public_responses_unchanged(a
     assert public_snapshot() == public_before
 
 
-def test_only_the_twenty_authorized_operations_are_published(americano_api):
+def test_only_the_twenty_one_authorized_operations_are_published(americano_api):
     from app.main import app
 
     paths = app.openapi()["paths"]
@@ -273,6 +273,7 @@ def test_only_the_twenty_authorized_operations_are_published(americano_api):
         ("POST", BASE + "/{event_id}/confirm-qualifiers"),
         ("GET", BASE + "/{event_id}/playoffs"),
         ("PUT", BASE + "/{event_id}/playoffs/{node_id}/result"),
+        ("PUT", BASE + "/{event_id}/playoffs/{node_id}/court"),
     }
 
 

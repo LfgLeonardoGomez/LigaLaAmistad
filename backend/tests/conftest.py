@@ -19,6 +19,7 @@ os.environ["DATABASE_URL"] = os.environ.get(
     "TEST_DATABASE_URL", f"sqlite:///{_TEST_DB}"
 )
 os.environ["SECRET_KEY"] = "test-secret-key-long-enough-for-hs256"
+os.environ["CORS_ORIGINS"] = "http://testserver,http://localhost:5173"
 os.environ["CLOUDINARY_CLOUD_NAME"] = ""
 os.environ["CLOUDINARY_API_KEY"] = ""
 os.environ["CLOUDINARY_API_SECRET"] = ""
@@ -58,7 +59,10 @@ def client():
         session.add(AdminUser(email=ADMIN_EMAIL, password_hash=ADMIN_PASSWORD_HASH))
         session.commit()
 
-    yield TestClient(app)
+    yield TestClient(app, headers={
+        "Origin": "http://testserver",
+        "X-Requested-With": "XMLHttpRequest",
+    })
 
     SQLModel.metadata.drop_all(engine)
 
@@ -70,7 +74,10 @@ def guest(client):
     `admin` and `client` are the same object, so they share cookies. Any test
     that needs two live sessions at once must use this.
     """
-    return TestClient(app)
+    return TestClient(app, headers={
+        "Origin": "http://testserver",
+        "X-Requested-With": "XMLHttpRequest",
+    })
 
 
 @pytest.fixture

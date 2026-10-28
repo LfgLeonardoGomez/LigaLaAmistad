@@ -6,7 +6,7 @@ from app.votes.models import VOTER_KEY_MAX_LENGTH, VOTER_KEY_MIN_LENGTH
 class VoteIn(SQLModel):
     model_config = {"extra": "forbid"}
 
-    team_id: int
+    team_id: int = Field(ge=1, le=2_147_483_647)
     voter_key: str = Field(min_length=VOTER_KEY_MIN_LENGTH, max_length=VOTER_KEY_MAX_LENGTH)
 
 

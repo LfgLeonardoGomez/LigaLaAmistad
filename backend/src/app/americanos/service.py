@@ -80,7 +80,11 @@ def _zones(session: Session, event_id: int) -> list[AmericanoZone]:
     ).all())
 
 
-def _summary(session: Session, event: AmericanoEvent, registration_count: int) -> dto.EventSummary:
+def _courts(event: AmericanoEvent) -> list[int]:
+    return [number for number in range(1, 7) if event.court_mask & (1 << (number - 1))]
+
+
+def _summary(session: Session, event: AmericanoEvent, registrations: list[AmericanoRegistration]) -> dto.EventSummary:
     rounds = session.exec(
         select(AmericanoRound).where(AmericanoRound.event_id == event.id)
         .order_by(AmericanoRound.number).execution_options(populate_existing=True)
@@ -99,13 +103,16 @@ def _summary(session: Session, event: AmericanoEvent, registration_count: int) -
         continuation = dto.QualificationContinuation(kind="qualification")
     else:
         continuation = dto.PlayoffsContinuation(kind="playoffs")
+    champion = next((pair for pair in registrations if pair.id == event.champion_registration_id), None)
     return dto.EventSummary(
         id=event.id, name=event.name, state=event.state.value,
         zone_count=event.zone_count, start_stage=event.start_stage.value,
+        courts=_courts(event),
         revision=event.revision, groups_revision=event.groups_revision,
-        registration_count=registration_count, total_rounds=len(rounds),
+        registration_count=len(registrations), total_rounds=len(rounds),
         saved_rounds=sum(round_.saved_at is not None for round_ in rounds),
         max_unlocked_round=unlocked, continuation=continuation,
+        champion=dto.Registration.model_validate(champion, from_attributes=True) if champion else None,
     )
 
 
@@ -137,7 +144,7 @@ def _detail(session: Session, event: AmericanoEvent) -> dto.EventDetail:
         # SQLite loses the tzinfo of UTC timestamps; PostgreSQL retains it.
         confirmed_at = confirmed_at.replace(tzinfo=UTC) if confirmed_at.tzinfo is None else confirmed_at
     return dto.EventDetail(
-        **_summary(session, event, len(registrations)).model_dump(),
+        **_summary(session, event, registrations).model_dump(),
         zones=[dto.Zone(id=zone.id, label=zone.label.value) for zone in zones],
         registrations=[dto.Registration(
             id=registration.id, zone_id=registration.zone_id,
@@ -157,13 +164,14 @@ def list_events(session: Session) -> dto.ListEventsResponse:
             select(AmericanoEvent).order_by(AmericanoEvent.id.desc())
             .with_for_update(read=True).execution_options(populate_existing=True)
         ).all()
-        return [_summary(session, event, len(_registrations(session, event.id))) for event in events]
+        return [_summary(session, event, _registrations(session, event.id)) for event in events]
 
 
 def create_event(session: Session, data: dto.CreateEventRequest) -> dto.EventDetail:
     with _transaction(session, write=True):
         event = AmericanoEvent(
             name=data.name, zone_count=data.zone_count, start_stage=AmericanoStage(data.start_stage),
+            court_mask=sum(1 << (court - 1) for court in data.courts),
         )
         session.add(event)
         session.flush()
@@ -226,6 +234,8 @@ def update_event(session: Session, event_id: int, data: dto.UpdateEventRequest) 
         event = _event(session, event_id, write=True)
         _validate_draft(event, data.expected_revision)
         changes = data.model_dump(exclude_unset=True, exclude={"expected_revision"})
+        if "courts" in changes:
+            event.court_mask = sum(1 << (court - 1) for court in changes.pop("courts"))
         if "zone_count" in changes:
             _change_zone_count(session, event, changes.pop("zone_count"))
         if "start_stage" in changes:
@@ -399,6 +409,7 @@ def _round_response(
         saved=saved, locked=False, read_only=detail.state in {"playoffs", "completed"}, zones=detail.zones,
         matches=[dto.GroupMatch(
             id=match.id, zone_id=match.zone_id, display_order=match.display_order,
+            court_number=match.court_number,
             registration_a=registrations[match.registration_a_id],
             registration_b=registrations[match.registration_b_id],
             games_a=match.games_a, games_b=match.games_b,
@@ -434,7 +445,7 @@ def generate_fixture(
             ZoneInput(zone.id, zone.label.value, tuple(
                 registration.id for registration in registrations if registration.zone_id == zone.id
             )) for zone in zones
-        ])
+        ], courts=_courts(event))
         first_matches = []
         for planned_round in fixture:
             round_ = AmericanoRound(event_id=event.id, number=planned_round.number)
@@ -446,6 +457,7 @@ def generate_fixture(
                     registration_a_id=planned_match.registration_a_id,
                     registration_b_id=planned_match.registration_b_id,
                     display_order=planned_match.display_order,
+                    court_number=planned_match.court_number,
                 )
                 session.add(match)
                 if planned_round.number == 1:
@@ -491,7 +503,7 @@ def _round_detail(session: Session, event: AmericanoEvent, number: int) -> dto.R
         ZoneInput(zone.id, zone.label, tuple(
             registration.id for registration in detail.registrations if registration.zone_id == zone.id
         )) for zone in detail.zones
-    ])
+    ], courts=detail.courts)
     return _round_response(
         detail, fixture[number - 1], _round_matches(session, event.id, round_.id),
         saved=round_.saved_at is not None,
@@ -716,7 +728,7 @@ def _validate_complete_groups(session: Session, event: AmericanoEvent, detail: d
         ZoneInput(zone.id, zone.label, tuple(
             registration.id for registration in detail.registrations if registration.zone_id == zone.id
         )) for zone in detail.zones
-    ])
+    ], courts=detail.courts)
     rounds = session.exec(select(AmericanoRound).where(
         AmericanoRound.event_id == event.id,
     ).execution_options(populate_existing=True)).all()
@@ -725,12 +737,13 @@ def _validate_complete_groups(session: Session, event: AmericanoEvent, detail: d
     ).execution_options(populate_existing=True)).all()
     round_numbers = {round_.id: round_.number for round_ in rounds}
     expected = {
-        (round_.number, match.zone_id, match.registration_a_id, match.registration_b_id, match.display_order)
+        (round_.number, match.zone_id, match.registration_a_id, match.registration_b_id, match.display_order,
+         match.court_number)
         for round_ in fixture for match in round_.matches
     }
     actual = {
         (round_numbers.get(match.round_id), match.zone_id, match.registration_a_id,
-         match.registration_b_id, match.display_order) for match in matches
+         match.registration_b_id, match.display_order, match.court_number) for match in matches
     }
     if ({round_.number for round_ in rounds} != {round_.number for round_ in fixture}
             or any(round_.saved_at is None for round_ in rounds) or actual != expected
@@ -776,6 +789,7 @@ def _playoffs_detail(session: Session, event: AmericanoEvent) -> dto.PlayoffsRes
         reason = edit_block_reason(node)
         result_nodes.append(dto.KnockoutNode(
             id=node.id, stage=node.stage.value, slot=node.slot,
+            court_number=node.court_number,
             registration_a=registrations.get(node.registration_a_id),
             registration_b=registrations.get(node.registration_b_id),
             games_a=node.games_a, games_b=node.games_b, set_complete=node.set_complete,
@@ -786,6 +800,7 @@ def _playoffs_detail(session: Session, event: AmericanoEvent) -> dto.PlayoffsRes
     return dto.PlayoffsResponse(
         event_id=event.id, event_name=detail.name, state=detail.state,
         revision=event.revision, groups_revision=event.groups_revision, start_stage=detail.start_stage,
+        courts=detail.courts,
         zones=detail.zones,
         snapshots=[dto.QualifierSnapshot(**{
             field: getattr(snapshot, field) for field in dto.QualifierSnapshot.model_fields
@@ -797,6 +812,37 @@ def _playoffs_detail(session: Session, event: AmericanoEvent) -> dto.PlayoffsRes
 def load_playoffs(session: Session, event_id: int) -> dto.PlayoffsResponse:
     with _transaction(session):
         return _playoffs_detail(session, _event(session, event_id))
+
+
+def assign_knockout_court(
+    session: Session, event_id: int, node_id: int, data: dto.AssignKnockoutCourtRequest,
+) -> dto.PlayoffsResponse:
+    """Courts are logistical suggestions, independent of scores and bracket propagation.
+
+    Reuse is allowed: matches in a stage need not be simultaneous. The UI makes
+    this explicit rather than presenting a stage as a global group round.
+    """
+    with _transaction(session, write=True):
+        event = _event(session, event_id, write=True)
+        _validate_revision(event, data.expected_revision)
+        if event.state != AmericanoEventState.PLAYOFFS:
+            raise AmericanoError(409, "state_conflict", "Las canchas se ajustan durante las eliminatorias.")
+        _validate_lookup_integer(node_id)
+        node = session.exec(select(AmericanoKnockoutMatch).where(
+            AmericanoKnockoutMatch.event_id == event.id, AmericanoKnockoutMatch.id == node_id,
+        ).execution_options(populate_existing=True)).first()
+        if node is None:
+            raise AmericanoError(404, "not_found", "Partido no encontrado.")
+        if node.set_complete:
+            raise AmericanoError(409, "state_conflict", "No se cambia la cancha de un partido ya jugado.")
+        if data.court_number not in _courts(event):
+            raise AmericanoError(422, "invalid_configuration", "La cancha no está disponible para este americano.")
+        node.court_number = data.court_number
+        session.add(node)
+        event.revision += 1
+        session.add(event)
+        session.flush()
+        return _playoffs_detail(session, event)
 
 
 def _canonical_bracket(session: Session, event: AmericanoEvent):
@@ -965,6 +1011,7 @@ def confirm_qualifiers(
         for planned in reversed(bracket):
             node = AmericanoKnockoutMatch(
                 event_id=event.id, stage=AmericanoStage(planned.stage), slot=planned.slot,
+                court_number=_courts(event)[(planned.slot - 1) % len(_courts(event))],
                 registration_a_id=planned.registration_a_id, registration_b_id=planned.registration_b_id,
                 next_match_id=persisted[(planned.next.stage, planned.next.slot)].id if planned.next else None,
                 next_side=AmericanoSide(planned.next.side) if planned.next else None,

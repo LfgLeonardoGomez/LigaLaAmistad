@@ -5,6 +5,7 @@ Migration preparation checks below are purely structural, not migration trials.
 """
 
 import ast
+from contextlib import contextmanager
 import importlib.util
 import os
 from pathlib import Path
@@ -79,6 +80,25 @@ class _PlanRecorder:
         self.created.append(name)
         return sa.Table(name, self.metadata, *items)
 
+    def add_column(self, table_name, column):
+        self.metadata.tables[table_name].append_column(column)
+
+    def execute(self, statement):
+        assert statement.startswith("UPDATE americano_")
+
+    @contextmanager
+    def batch_alter_table(self, table_name):
+        table = self.metadata.tables[table_name]
+
+        class Batch:
+            def create_check_constraint(self, name, condition):
+                table.append_constraint(sa.CheckConstraint(condition, name=name))
+
+            def create_unique_constraint(self, name, columns):
+                table.append_constraint(sa.UniqueConstraint(*columns, name=name))
+
+        yield Batch()
+
     def create_index(self, name, table_name, columns):
         assert name.startswith("ix_americano_") and table_name.startswith("americano_")
         table = self.metadata.tables[table_name]
@@ -121,7 +141,7 @@ def _signature(table):
     constraints = set()
     for constraint in table.constraints:
         if isinstance(constraint, sa.CheckConstraint):
-            sql = str(constraint.sqltext.compile(dialect=dialect, compile_kwargs={"literal_binds": True}))
+            sql = str(constraint.sqltext.compile(dialect=dialect, compile_kwargs={"literal_binds": True, "include_table": False}))
             constraints.add(("check", constraint.name, sql))
         elif isinstance(constraint, sa.UniqueConstraint):
             constraints.add(("unique", constraint.name, tuple(column.name for column in constraint.columns)))
@@ -142,6 +162,13 @@ def test_additive_revision_mock_plan_matches_all_eight_models_and_inverse():
     recorder = _PlanRecorder()
     module.op = recorder
     module.upgrade()
+    court_spec = importlib.util.spec_from_file_location(
+        "americano_court_plan", REVISION.parent / "a2c37e91d046_add_americano_courts.py",
+    )
+    courts = importlib.util.module_from_spec(court_spec)
+    court_spec.loader.exec_module(courts)
+    courts.op = recorder
+    courts.upgrade()
     expected = {name: table for name, table in SQLModel.metadata.tables.items() if name.startswith("americano_")}
     assert len(recorder.created) == len(expected) == 8
     assert set(recorder.created) == set(expected)
@@ -177,7 +204,26 @@ def test_revision_has_single_current_parent_and_env_import_is_explicit():
         if assignments["down_revision"]:
             parents.add(assignments["down_revision"])
     assert revisions["f1a62d9c4b83"] == "e8a3c015f9b2"
-    assert set(revisions) - parents == {"f1a62d9c4b83"}
+    assert revisions["a2c37e91d046"] == "f1a62d9c4b83"
+    assert set(revisions) - parents == {"a2c37e91d046"}
     tree = ast.parse((BACKEND / "migrations/env.py").read_text(encoding="utf-8-sig"))
     assert any(isinstance(node, ast.ImportFrom) and node.module == "app.americanos"
                and any(alias.name == "models" for alias in node.names) for node in tree.body)
+    imports = {node.module for node in tree.body if isinstance(node, ast.ImportFrom)
+               and any(alias.name == "models" for alias in node.names)}
+    assert {"app.americanos", "app.auth", "app.matches", "app.playoffs", "app.predictions",
+            "app.sponsors", "app.teams", "app.votes", "app.zones"} <= imports
+
+
+def test_enum_checks_are_explicit_and_visible_to_migration_comparison():
+    from app.americanos.models import AmericanoEvent, AmericanoKnockoutMatch, AmericanoZone
+
+    for model, fields in [
+        (AmericanoEvent, [("state", "ck_americano_events_state"), ("start_stage", "ck_americano_events_start_stage")]),
+        (AmericanoZone, [("label", "ck_americano_zones_label")]),
+        (AmericanoKnockoutMatch, [("stage", "ck_americano_knockout_matches_stage"), ("next_side", "ck_americano_knockout_matches_side")]),
+    ]:
+        for field, name in fields:
+            assert model.__table__.c[field].type.create_constraint is False
+            matches = [constraint for constraint in model.__table__.constraints if constraint.name == name]
+            assert len(matches) == 1 and isinstance(matches[0], sa.CheckConstraint)

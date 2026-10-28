@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
@@ -7,35 +8,35 @@ from app.auth.deps import COOKIE_NAME, get_current_admin
 from app.auth.models import AdminUser
 from app.auth.schemas import AdminCreate, AdminRead, AdminUpdate, LoginIn
 from app.core.config import settings
+from app.core.csrf import require_same_origin
 from app.core.ratelimit import check_rate_limit, clear_attempts, client_key
 from app.core.security import create_access_token
 from app.database.session import SessionDep
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(
+    prefix="/auth", tags=["auth"], dependencies=[Depends(require_same_origin)],
+)
 
 CurrentAdmin = Annotated[AdminUser, Depends(get_current_admin)]
 
 
 @router.post("/login", response_model=AdminRead)
 def login(data: LoginIn, request: Request, response: Response, session: SessionDep):
-    # Two buckets. The address stops a script hammering from one machine; the
-    # email stops the same account being ground down from many, which is the
-    # attack the address bucket cannot see behind a proxy.
+    # Limit the transport peer only. A per-email lockout would let anyone who
+    # knows an admin email deny that administrator access.
     by_address = f"ip:{client_key(request)}"
-    by_email = f"email:{data.email.strip().lower()}"
-    for key in (by_address, by_email):
-        check_rate_limit(
-            key,
-            max_attempts=settings.login_max_attempts,
-            window_seconds=settings.login_window_seconds,
-        )
+    check_rate_limit(
+        by_address,
+        max_attempts=settings.login_max_attempts,
+        window_seconds=settings.login_window_seconds,
+    )
 
     admin = service.authenticate(session, data)
-    clear_attempts(by_address, by_email)
+    clear_attempts(by_address)
 
     response.set_cookie(
         key=COOKIE_NAME,
-        value=create_access_token(admin.id),
+        value=create_access_token(admin.id, admin.updated_at),
         httponly=True,
         secure=settings.cookie_secure,
         samesite=settings.cookie_samesite,
@@ -45,7 +46,7 @@ def login(data: LoginIn, request: Request, response: Response, session: SessionD
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(response: Response):
+def logout(response: Response, admin: CurrentAdmin, session: SessionDep):
     # The attributes must match the ones used at login, or the browser keeps
     # the original cookie and the logout does nothing.
     response.delete_cookie(
@@ -54,6 +55,10 @@ def logout(response: Response):
         secure=settings.cookie_secure,
         samesite=settings.cookie_samesite,
     )
+    # Rotate the account auth version so copied cookies stop working too.
+    admin.updated_at = datetime.now(UTC)
+    session.add(admin)
+    session.commit()
 
 
 @router.get("/me", response_model=AdminRead)
@@ -66,7 +71,7 @@ def me(admin: CurrentAdmin):
 admin_users_router = APIRouter(
     prefix="/admin/users",
     tags=["admin: users"],
-    dependencies=[Depends(get_current_admin)],
+    dependencies=[Depends(get_current_admin), Depends(require_same_origin)],
 )
 
 

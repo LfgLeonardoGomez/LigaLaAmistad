@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -106,4 +107,6 @@ class Settings(BaseSettings):
         )
 
 
-settings = Settings()
+# Isolated developer runners can select an empty/nonexistent settings file
+# instead of inheriting uploads or credentials from the normal backend/.env.
+settings = Settings(_env_file=os.environ.get("LIGA_ENV_FILE", ENV_FILE))

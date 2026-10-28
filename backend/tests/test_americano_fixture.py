@@ -1,10 +1,47 @@
 """Pure fixture contracts; run with --noconftest (no application/database)."""
 
+from collections import Counter
 from itertools import combinations
 
 import pytest
 
 from app.americanos.fixture import AmericanoDomainError, Pairing, ZoneInput, build_fixture, zone_pairings
+
+
+@pytest.mark.parametrize('courts', [[1, 2, 3], [3, 4, 5, 6], [1, 2, 3, 4, 5, 6]])
+def test_seven_pairs_have_exactly_one_rest_each_and_play_every_rival(courts):
+    ids = tuple(range(1, 8))
+    fixture = build_fixture([ZoneInput(1, 'A', ids)], courts=courts)
+    assert len(fixture) == 7
+    matches = [match for round_ in fixture for match in round_.matches]
+    assert len(matches) == 21
+    assert Counter(rest.registration_id for round_ in fixture for rest in round_.resting) == Counter({id_: 1 for id_ in ids})
+    assert all(rest.reason == 'bye' for round_ in fixture for rest in round_.resting)
+    actual = [(match.registration_a_id, match.registration_b_id) for match in matches]
+    assert Counter(actual) == Counter(combinations(ids, 2))
+    assert Counter(id_ for pair in actual for id_ in pair) == Counter({id_: 6 for id_ in ids})
+
+
+@pytest.mark.parametrize('size', range(2, 26))
+def test_logical_rounds_never_repeat_a_bye_and_cover_every_pair(size):
+    ids = tuple(range(1, size + 1))
+    logical = zone_pairings(ids)
+    byes = Counter(round_.bye_registration_id for round_ in logical if round_.bye_registration_id is not None)
+    assert byes == (Counter({id_: 1 for id_ in ids}) if size % 2 else Counter())
+    assert Counter((pair.registration_a_id, pair.registration_b_id) for round_ in logical for pair in round_.pairings) == Counter(combinations(ids, 2))
+
+
+@pytest.mark.parametrize('courts', [[6], [3, 6]])
+def test_seven_pairs_need_repeated_capacity_rests_when_courts_are_insufficient(courts):
+    ids = tuple(range(1, 8))
+    fixture = build_fixture([ZoneInput(1, 'A', ids)], courts=courts)
+    appearances = Counter(id_ for round_ in fixture for match in round_.matches
+                          for id_ in (match.registration_a_id, match.registration_b_id))
+    assert appearances == Counter({id_: 6 for id_ in ids})
+    rests = Counter(rest.registration_id for round_ in fixture for rest in round_.resting)
+    assert all(rests[id_] == len(fixture) - 6 for id_ in ids)
+    assert all(rests[id_] > 1 for id_ in ids)
+    assert any(rest.reason == 'capacity' for round_ in fixture for rest in round_.resting)
 
 
 def test_berger_keeps_registration_order_and_canonicalizes_sides():

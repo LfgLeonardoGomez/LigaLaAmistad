@@ -28,5 +28,7 @@ def get_current_admin(
     admin = session.get(AdminUser, admin_id)
     if admin is None or not admin.is_active:
         raise unauthorized
+    if read_access_token(access_token, admin.updated_at) is None:
+        raise unauthorized
 
     return admin

@@ -14,6 +14,35 @@ def test_every_public_endpoint_is_open(client):
         assert client.get(path).status_code == 200, path
 
 
+def test_public_vote_tally_ignores_non_ascii_and_out_of_range_ids(client):
+    response = client.get("/public/matches/votes?ids=%C2%B2,2147483648,0")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_public_vote_tally_bounds_query_values(client):
+    assert client.get("/public/matches/votes?ids=" + "9" * 601).status_code == 422
+    assert client.get("/public/matches/votes?voter_key=" + "a" * 65).status_code == 422
+
+
+def test_public_numeric_filters_reject_out_of_range_ids(client):
+    assert client.get("/public/teams?zone_id=2147483648").status_code == 422
+    assert client.get("/public/matches?zone_id=2147483648").status_code == 422
+    assert client.get("/public/standings?zone_id=2147483648").status_code == 422
+
+
+def test_public_match_votes_reject_out_of_range_ids(client):
+    assert client.post(
+        "/public/matches/2147483648/votes",
+        json={"team_id": 1, "voter_key": "device-key-123456"},
+    ).status_code == 422
+    assert client.post(
+        "/public/matches/1/votes",
+        json={"team_id": 2147483648, "voter_key": "device-key-123456"},
+    ).status_code == 422
+
+
 def test_zones_come_from_the_seed(client):
     names = [zone["name"] for zone in client.get("/public/zones").json()]
 

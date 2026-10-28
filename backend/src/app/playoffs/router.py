@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status
 
 from app.auth.deps import get_current_admin
+from app.core.csrf import require_same_origin
 from app.database.session import SessionDep
 from app.playoffs import service
 from app.playoffs.schemas import BracketRead, GenerateBracketIn
@@ -8,7 +9,7 @@ from app.playoffs.schemas import BracketRead, GenerateBracketIn
 router = APIRouter(
     prefix="/playoffs",
     tags=["admin: playoffs"],
-    dependencies=[Depends(get_current_admin)],
+    dependencies=[Depends(get_current_admin), Depends(require_same_origin)],
 )
 
 

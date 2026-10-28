@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, UploadFile, status
 
 from app.auth.deps import get_current_admin
 from app.core.config import settings
+from app.core.csrf import require_same_origin
 from app.core.images import upload_image
 from app.database.session import SessionDep
 from app.sponsors import service
@@ -10,7 +11,7 @@ from app.sponsors.schemas import SponsorCreate, SponsorRead, SponsorUpdate
 router = APIRouter(
     prefix="/admin/sponsors",
     tags=["admin: sponsors"],
-    dependencies=[Depends(get_current_admin)],
+    dependencies=[Depends(get_current_admin), Depends(require_same_origin)],
 )
 
 

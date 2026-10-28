@@ -8,7 +8,9 @@ Zones have no module of their own here (they are seed data, not a managed
 entity), so their single public endpoint lives with the rest of the public API.
 """
 
-from fastapi import APIRouter, Request
+from typing import Annotated
+
+from fastapi import APIRouter, Path, Query, Request
 from sqlmodel import select
 
 from app.core.ratelimit import check_rate_limit, client_key
@@ -26,6 +28,7 @@ from app.standings.schemas import StandingRead
 from app.teams import service as team_service
 from app.teams.schemas import TeamRead
 from app.votes import service as vote_service
+from app.votes.models import VOTER_KEY_MAX_LENGTH, VOTER_KEY_MIN_LENGTH
 from app.votes.schemas import VoteIn, VoteTally
 from app.zones.models import Zone
 from app.zones.schemas import ZoneRead
@@ -44,6 +47,8 @@ PREDICTIONS_PER_WINDOW = 10
 # twenty in the results list. The cap is what stops a caller asking for the
 # whole table in one request.
 MAX_TALLIED_MATCHES = 50
+MAX_DATABASE_ID = 2_147_483_647
+MAX_TALLY_QUERY_LENGTH = 600
 
 
 @router.get("/zones", response_model=list[ZoneRead])
@@ -52,14 +57,17 @@ def list_zones(session: SessionDep):
 
 
 @router.get("/teams", response_model=list[TeamRead])
-def list_teams(session: SessionDep, zone_id: int | None = None):
+def list_teams(
+    session: SessionDep,
+    zone_id: Annotated[int | None, Query(ge=1, le=MAX_DATABASE_ID)] = None,
+):
     return team_service.list_teams(session, zone_id)
 
 
 @router.get("/matches", response_model=list[MatchRead])
 def list_matches(
     session: SessionDep,
-    zone_id: int | None = None,
+    zone_id: Annotated[int | None, Query(ge=1, le=MAX_DATABASE_ID)] = None,
     status: MatchStatus = MatchStatus.PLAYED,
 ):
     """Played matches by default, pending ones on request.
@@ -90,11 +98,29 @@ def _parse_ids(ids: str) -> list[int]:
     that must render anyway, so it never fails the whole request over one.
     """
     parsed = [chunk.strip() for chunk in ids.split(",")]
-    return [int(chunk) for chunk in parsed if chunk.isdigit()][:MAX_TALLIED_MATCHES]
+    valid_ids: list[int] = []
+    for chunk in parsed:
+        # `str.isdigit()` accepts characters such as superscript two (²),
+        # which `int()` cannot parse. Database IDs are positive 32-bit ints.
+        if not chunk.isascii() or not chunk.isdecimal() or len(chunk) > 10:
+            continue
+        match_id = int(chunk)
+        if 1 <= match_id <= MAX_DATABASE_ID:
+            valid_ids.append(match_id)
+        if len(valid_ids) == MAX_TALLIED_MATCHES:
+            break
+    return valid_ids
 
 
 @router.get("/matches/votes", response_model=list[VoteTally])
-def tally_match_votes(session: SessionDep, ids: str = "", voter_key: str | None = None):
+def tally_match_votes(
+    session: SessionDep,
+    ids: Annotated[str, Query(max_length=MAX_TALLY_QUERY_LENGTH)] = "",
+    voter_key: Annotated[
+        str | None,
+        Query(min_length=VOTER_KEY_MIN_LENGTH, max_length=VOTER_KEY_MAX_LENGTH),
+    ] = None,
+):
     """Vote counts for the given matches, in one call instead of one each.
 
     `voter_key` is optional and only decides whether the answer says what this
@@ -104,7 +130,12 @@ def tally_match_votes(session: SessionDep, ids: str = "", voter_key: str | None 
 
 
 @router.post("/matches/{match_id}/votes", response_model=VoteTally)
-def cast_match_vote(match_id: int, data: VoteIn, request: Request, session: SessionDep):
+def cast_match_vote(
+    match_id: Annotated[int, Path(ge=1, le=MAX_DATABASE_ID)],
+    data: VoteIn,
+    request: Request,
+    session: SessionDep,
+):
     check_rate_limit(
         f"vote:{client_key(request)}",
         VOTES_PER_WINDOW,
@@ -115,7 +146,13 @@ def cast_match_vote(match_id: int, data: VoteIn, request: Request, session: Sess
 
 
 @router.get("/predictions", response_model=PollState)
-def prediction_state(session: SessionDep, voter_key: str | None = None):
+def prediction_state(
+    session: SessionDep,
+    voter_key: Annotated[
+        str | None,
+        Query(min_length=VOTER_KEY_MIN_LENGTH, max_length=VOTER_KEY_MAX_LENGTH),
+    ] = None,
+):
     """Whether the season poll is running, and what this device already said."""
     return prediction_service.state(session, voter_key)
 
@@ -138,7 +175,10 @@ def prediction_results(session: SessionDep):
 
 
 @router.get("/standings", response_model=list[StandingRead])
-def list_standings(session: SessionDep, zone_id: int):
+def list_standings(
+    session: SessionDep,
+    zone_id: Annotated[int, Query(ge=1, le=MAX_DATABASE_ID)],
+):
     return standings_service.get_standings(session, zone_id)
 
 

@@ -22,6 +22,7 @@ def test_create_event_trims_name_and_serializes_the_contract():
         "name": "Amistad de octubre",
         "zone_count": 2,
         "start_stage": "semifinal",
+        "courts": [1, 2, 3, 4, 5, 6],
     }
 
 
@@ -83,6 +84,21 @@ def test_bulk_registration_requires_at_least_two_complete_pairs():
                 {"player1_name": "Ana", "player2_name": "Sol"},
                 {"player1_name": "Eva", "player2_name": " "},
             ],
+        })
+
+
+def test_bulk_registration_accepts_the_transport_batch_limit_and_rejects_one_more():
+    pair = {"player1_name": "Ana", "player2_name": "Sol"}
+    accepted = schemas.BulkRegistrationRequest.model_validate({
+        "expected_revision": 1,
+        "registrations": [pair.copy() for _ in range(schemas.MAX_BULK_REGISTRATIONS)],
+    })
+    assert len(accepted.registrations) == schemas.MAX_BULK_REGISTRATIONS
+
+    with pytest.raises(ValidationError):
+        schemas.BulkRegistrationRequest.model_validate({
+            "expected_revision": 1,
+            "registrations": [pair.copy() for _ in range(schemas.MAX_BULK_REGISTRATIONS + 1)],
         })
 
 
@@ -338,6 +354,8 @@ def registration(registration_id=1):
 
 def event_detail():
     return {
+        "champion": None,
+        "courts": [1, 2, 3, 4, 5, 6],
         "id": 100, "name": "Copa", "state": "review", "zone_count": 1, "start_stage": "semifinal",
         "revision": 8, "groups_revision": 3, "registration_count": 4, "total_rounds": 3,
         "saved_rounds": 3, "max_unlocked_round": 3, "continuation": {"kind": "qualification"},
@@ -349,7 +367,7 @@ def event_detail():
 
 
 def group_match():
-    return {"id": 101, "zone_id": 10, "display_order": 1, "registration_a": registration(1),
+    return {"id": 101, "zone_id": 10, "display_order": 1, "court_number": 1, "registration_a": registration(1),
             "registration_b": registration(2), "games_a": None, "games_b": None}
 
 
@@ -406,7 +424,7 @@ def qualification_response():
 
 
 def knockout_node():
-    return {"id": 201, "stage": "semifinal", "slot": 1, "registration_a": registration(1),
+    return {"id": 201, "stage": "semifinal", "slot": 1, "court_number": 1, "registration_a": registration(1),
             "registration_b": registration(4), "games_a": None, "games_b": None, "set_complete": False,
             "next_match_id": 203, "next_side": "a", "winner_registration_id": None,
             "can_edit": False, "edit_block_reason": "rules_pending_approval"}
@@ -418,7 +436,7 @@ def playoffs_response():
     final = {**knockout_node(), "id": 203, "stage": "final", "registration_a": None, "registration_b": None,
              "next_match_id": None, "next_side": None, "edit_block_reason": "participants_pending"}
     return {"event_id": 100, "event_name": "Copa", "state": "playoffs", "revision": 9, "groups_revision": 3,
-            "start_stage": "semifinal", "zones": [{"id": 10, "label": "A"}],
+            "start_stage": "semifinal", "courts": [1, 2, 3, 4, 5, 6], "zones": [{"id": 10, "label": "A"}],
             "snapshots": [{"zone_id": 10, "position": i, "registration_id": i, "player1_name": "Ana",
                            "player2_name": "Luz", "points_half_units": 3, "games_diff": 0,
                            "source_groups_revision": 3} for i in range(1, 5)],
@@ -485,7 +503,7 @@ def test_summary_list_is_a_bare_array_and_empty_draft_is_valid():
              "configuration_issues": [{"code": "insufficient_registrations", "zone_id": 10,
                                        "registration_ids": [], "message": "Se necesitan cuatro parejas."}]}
     assert schemas.EventDetail(**draft).model_dump(mode="json") == draft
-    summary = {key: draft[key] for key in ["id", "name", "state", "zone_count", "start_stage", "revision",
+    summary = {key: draft[key] for key in ["id", "name", "state", "zone_count", "start_stage", "courts", "champion", "revision",
                "groups_revision", "registration_count", "total_rounds", "saved_rounds", "max_unlocked_round", "continuation"]}
     adapter = TypeAdapter(schemas.ListEventsResponse)
     assert adapter.dump_python(adapter.validate_python([summary]), mode="json") == [summary]

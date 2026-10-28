@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
@@ -21,6 +23,7 @@ def authenticate(session: Session, data: LoginIn) -> AdminUser:
         select(AdminUser).where(AdminUser.email == data.email)
     ).first()
 
+    # Same response for unknown accounts and malformed/oversized passwords.
     if admin is None or not verify_password(data.password, admin.password_hash):
         raise invalid
     if not admin.is_active:
@@ -75,6 +78,7 @@ def update_admin(
 
     if "password" in changes:
         admin.password_hash = hash_password(changes.pop("password"))
+        admin.updated_at = datetime.now(UTC)
 
     for field, value in changes.items():
         setattr(admin, field, value)

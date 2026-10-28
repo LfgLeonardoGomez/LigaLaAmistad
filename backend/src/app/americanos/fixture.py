@@ -49,6 +49,7 @@ class FixtureMatch:
     registration_a_id: int
     registration_b_id: int
     display_order: int
+    court_number: int
 
 
 @dataclass(frozen=True)
@@ -115,12 +116,22 @@ def _validate_zones(zones: Sequence[ZoneInput]) -> None:
         seen_labels.add(zone.label)
 
 
-def build_fixture(zones: Sequence[ZoneInput], capacity: int = 6) -> tuple[FixtureRound, ...]:
+def build_fixture(
+    zones: Sequence[ZoneInput], capacity: int = 6, *, courts: Sequence[int] | None = None,
+) -> tuple[FixtureRound, ...]:
     """Merge equal Berger indices before splitting; never pack across logical blocks."""
     if type(capacity) is not int or not 1 <= capacity <= 6:
         raise AmericanoDomainError(
             'invalid_configuration', 'Court capacity must be an integer from 1 to 6.', ('capacity',),
         )
+    available = tuple(range(1, capacity + 1)) if courts is None else tuple(courts)
+    if (not 1 <= len(available) <= 6 or any(type(c) is not int or not 1 <= c <= 6 for c in available)
+            or len(set(available)) != len(available)):
+        raise AmericanoDomainError(
+            'invalid_configuration', 'Select unique courts from 1 to 6.', ('courts',),
+        )
+    available = tuple(sorted(available))
+    capacity = len(available)
     _validate_zones(zones)
     ordered_zones = sorted(zones, key=lambda z: z.label)
     schedules = {z.zone_id: zone_pairings(z.registration_ids) for z in ordered_zones}
@@ -131,9 +142,18 @@ def build_fixture(zones: Sequence[ZoneInput], capacity: int = 6) -> tuple[Fixtur
             for z in ordered_zones if index < len(schedules[z.zone_id])
             for p in schedules[z.zone_id][index].pairings
         ]
+        if courts is not None and capacity < 6:
+            # Share reduced capacity between zones instead of leaving all of B
+            # idle while scheduling all of A. Keep the historical six-court
+            # ordering so deployed fixtures can still be reconstructed exactly.
+            active = [(z.zone_id, schedules[z.zone_id][index].pairings)
+                      for z in ordered_zones if index < len(schedules[z.zone_id])]
+            block = [(zone_id, pairings[slot])
+                     for slot in range(max((len(pairings) for _, pairings in active), default=0))
+                     for zone_id, pairings in active if slot < len(pairings)]
         for offset in range(0, len(block), capacity):
             matches = tuple(
-                FixtureMatch(zone_id, p.registration_a_id, p.registration_b_id, order)
+                FixtureMatch(zone_id, p.registration_a_id, p.registration_b_id, order, available[order - 1])
                 for order, (zone_id, p) in enumerate(block[offset:offset + capacity], 1)
             )
             playing = {i for m in matches for i in (m.registration_a_id, m.registration_b_id)}

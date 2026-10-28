@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, UploadFile, status
 
 from app.auth.deps import get_current_admin
 from app.core.config import settings
+from app.core.csrf import require_same_origin
 from app.core.images import upload_image
 from app.database.session import SessionDep
 from app.matches import service
@@ -17,7 +18,7 @@ from app.matches.schemas import (
 router = APIRouter(
     prefix="/admin/matches",
     tags=["admin: matches"],
-    dependencies=[Depends(get_current_admin)],
+    dependencies=[Depends(get_current_admin), Depends(require_same_origin)],
 )
 
 

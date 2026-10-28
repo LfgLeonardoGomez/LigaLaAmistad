@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.auth.deps import get_current_admin
+from app.core.csrf import require_same_origin
 from app.database.session import SessionDep
 from app.predictions import service
 from app.predictions.schemas import OpenPollIn, PollState
@@ -8,7 +9,7 @@ from app.predictions.schemas import OpenPollIn, PollState
 router = APIRouter(
     prefix="/admin/predictions",
     tags=["admin: predictions"],
-    dependencies=[Depends(get_current_admin)],
+    dependencies=[Depends(get_current_admin), Depends(require_same_origin)],
 )
 
 

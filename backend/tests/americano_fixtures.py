@@ -32,7 +32,10 @@ class AmericanoAPI:
         if mode == "anonymous":
             return
         admin_id = self.inactive_id if mode == "inactive" else self.active_id
-        token = create_access_token(admin_id)
+        with Session(self.engine) as session:
+            admin = session.get(AdminUser, admin_id)
+            assert admin is not None
+            token = create_access_token(admin_id, admin.updated_at)
         if mode == "expired":
             token = jwt.encode(
                 {"sub": str(admin_id), "exp": datetime.datetime.now(datetime.UTC)
@@ -69,7 +72,10 @@ def americano_api():
     previous = app.dependency_overrides.copy()
     app.dependency_overrides[get_session] = isolated_session
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers={
+            "Origin": "http://testserver",
+            "X-Requested-With": "XMLHttpRequest",
+        }) as client:
             api = AmericanoAPI(client, engine, active_id, inactive_id)
             api.authenticate()
             yield api

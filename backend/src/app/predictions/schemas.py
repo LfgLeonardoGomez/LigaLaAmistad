@@ -1,5 +1,6 @@
 import datetime
 
+from pydantic import model_validator
 from sqlmodel import Field, SQLModel
 
 from app.predictions.models import DEFAULT_POLL_DAYS
@@ -9,9 +10,9 @@ from app.votes.models import VOTER_KEY_MAX_LENGTH, VOTER_KEY_MIN_LENGTH
 class ZonePick(SQLModel):
     model_config = {"extra": "forbid"}
 
-    zone_id: int
-    first_team_id: int
-    second_team_id: int
+    zone_id: int = Field(ge=1, le=2_147_483_647)
+    first_team_id: int = Field(ge=1, le=2_147_483_647)
+    second_team_id: int = Field(ge=1, le=2_147_483_647)
 
 
 class PredictionIn(SQLModel):
@@ -24,7 +25,14 @@ class PredictionIn(SQLModel):
     model_config = {"extra": "forbid"}
 
     voter_key: str = Field(min_length=VOTER_KEY_MIN_LENGTH, max_length=VOTER_KEY_MAX_LENGTH)
-    zones: list[ZonePick] = Field(min_length=1)
+    zones: list[ZonePick] = Field(min_length=1, max_length=2)
+
+    @model_validator(mode="after")
+    def unique_zones(self):
+        zone_ids = [pick.zone_id for pick in self.zones]
+        if len(zone_ids) != len(set(zone_ids)):
+            raise ValueError("A ballot may contain each zone only once")
+        return self
 
 
 class PollState(SQLModel):

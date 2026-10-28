@@ -63,6 +63,40 @@ def test_a_prediction_is_recorded(client, open_poll, zone_a):
     assert response.json()["voted"] is True
 
 
+def test_prediction_ballot_rejects_duplicate_zones(client, open_poll, zone_a):
+    pick = {"zone_id": ZONE_A, "first_team_id": zone_a[0], "second_team_id": zone_a[1]}
+
+    response = client.post(
+        "/public/predictions",
+        json={"voter_key": DEVICE, "zones": [pick, pick]},
+    )
+
+    assert response.status_code == 422
+
+
+def test_prediction_ballot_is_limited_to_the_two_existing_zones(client, open_poll, zone_a):
+    pick = {"zone_id": ZONE_A, "first_team_id": zone_a[0], "second_team_id": zone_a[1]}
+
+    response = client.post(
+        "/public/predictions",
+        json={"voter_key": DEVICE, "zones": [pick, pick, pick]},
+    )
+
+    assert response.status_code == 422
+
+
+def test_prediction_ids_must_fit_database_id_range(client, open_poll):
+    response = client.post(
+        "/public/predictions",
+        json={
+            "voter_key": DEVICE,
+            "zones": [{"zone_id": 1, "first_team_id": 2_147_483_648, "second_team_id": 3}],
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_the_device_gets_its_own_picks_back(client, open_poll, zone_a):
     predict(client, ZONE_A, zone_a[0], zone_a[1])
 

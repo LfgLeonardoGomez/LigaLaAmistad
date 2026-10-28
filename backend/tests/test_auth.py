@@ -37,8 +37,31 @@ def test_me_returns_the_logged_in_admin(admin):
 
 
 def test_logout_ends_the_session(admin):
+    copied_cookie = admin.cookies.get("access_token")
     assert admin.post("/auth/logout").status_code == 204
     assert admin.get("/auth/me").status_code == 401
+    # Clearing the browser cookie alone is insufficient if it was copied.
+    admin.cookies.set("access_token", copied_cookie)
+    assert admin.get("/auth/me").status_code == 401
+
+
+def test_password_change_revokes_existing_sessions(admin):
+    stale_cookie = admin.cookies.get("access_token")
+    response = admin.patch(
+        "/admin/users/1", json={"password": "new-password-123"}
+    )
+    assert response.status_code == 200
+    admin.cookies.set("access_token", stale_cookie)
+    assert admin.get("/auth/me").status_code == 401
+    assert login(admin, password="new-password-123").status_code == 200
+
+
+def test_oversized_password_returns_same_auth_error_for_known_and_unknown_email(client):
+    password = "Ã©" * 37  # 74 UTF-8 bytes; under the character limit, over bcrypt's byte limit.
+    known = login(client, password=password)
+    unknown = login(client, password=password, email="ghost@test.com")
+    assert known.status_code == unknown.status_code == 401
+    assert known.json()["detail"] == unknown.json()["detail"]
 
 
 def test_a_tampered_token_is_rejected(admin):
@@ -78,73 +101,61 @@ def test_a_successful_login_clears_the_counter(client, monkeypatch):
     assert login(client, password="nope").status_code == 401
 
 
-def test_the_limit_counts_the_forwarded_address_not_the_proxy(client, monkeypatch):
-    """Behind a proxy every request arrives from the proxy, and if the fleet
-    rotates addresses each one looks like a new person. That is how the limit
-    silently stopped working in production."""
+def test_forwarded_address_is_not_trusted_for_rate_limiting(client, monkeypatch):
+    """An untrusted caller cannot evade the peer-address bucket by spoofing XFF."""
     monkeypatch.setattr(settings, "login_max_attempts", 3)
 
-    # Same caller, seen through three different edge servers.
+    # Spoofed forwarded addresses do not create distinct address buckets.
     for index in range(3):
         response = client.post(
             "/auth/login",
             json={"email": "otro@test.com", "password": "nope"},
-            headers={"X-Forwarded-For": f"203.0.113.7, 10.0.0.{index}"},
+            headers={"X-Forwarded-For": f"203.0.113.{index}"},
         )
         assert response.status_code == 401
 
     blocked = client.post(
         "/auth/login",
         json={"email": "otro@test.com", "password": "nope"},
-        headers={"X-Forwarded-For": "203.0.113.7, 10.0.0.99"},
+        headers={"X-Forwarded-For": "203.0.113.99"},
     )
     assert blocked.status_code == 429
 
 
-def test_one_account_is_protected_even_from_many_addresses(client, monkeypatch):
-    """The address bucket can be dodged by rotating addresses. The email one
-    cannot, and it is the bucket that matters when someone grinds down a
-    single account."""
+def test_failures_from_other_peers_do_not_lock_out_the_account(client, monkeypatch):
+    """A targeted attacker cannot consume a victim-specific login quota."""
     monkeypatch.setattr(settings, "login_max_attempts", 3)
+    from app.auth import router as auth_router
+    monkeypatch.setattr(
+        auth_router, "client_key", lambda request: request.headers["x-test-peer"]
+    )
 
     for index in range(3):
         response = client.post(
             "/auth/login",
             json={"email": ADMIN_EMAIL, "password": "nope"},
-            headers={"X-Forwarded-For": f"198.51.100.{index}"},
+            headers={"X-Test-Peer": f"attacker-peer-{index}"},
         )
         assert response.status_code == 401
 
-    blocked = client.post(
-        "/auth/login",
-        json={"email": ADMIN_EMAIL, "password": "nope"},
-        headers={"X-Forwarded-For": "198.51.100.200"},
-    )
-    assert blocked.status_code == 429
-
-
-def test_the_email_bucket_ignores_case_and_spacing(client, monkeypatch):
-    monkeypatch.setattr(settings, "login_max_attempts", 2)
-
-    for value in (ADMIN_EMAIL, ADMIN_EMAIL.upper()):
-        client.post("/auth/login", json={"email": value, "password": "nope"})
-
-    blocked = client.post(
-        "/auth/login", json={"email": f"  {ADMIN_EMAIL}  ", "password": "nope"}
-    )
-    assert blocked.status_code == 429
-
-
-def test_a_blocked_account_does_not_block_a_different_one(client, monkeypatch):
-    monkeypatch.setattr(settings, "login_max_attempts", 2)
-
-    for _ in range(3):
-        client.post("/auth/login", json={"email": "victima@test.com", "password": "nope"})
-
-    # The real admin must still be able to get in from another address.
-    response = client.post(
+    success = client.post(
         "/auth/login",
         json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
-        headers={"X-Forwarded-For": "203.0.113.250"},
+        headers={"X-Test-Peer": "administrator-peer"},
     )
-    assert response.status_code == 200
+    assert success.status_code == 200
+
+
+def test_expired_rate_limit_buckets_are_garbage_collected(client, monkeypatch):
+    from app.core import ratelimit
+
+    now = [100.0]
+    monkeypatch.setattr(ratelimit.time, "monotonic", lambda: now[0])
+    ratelimit.check_rate_limit("email:arbitrary@example.test", 2, 10)
+    assert "email:arbitrary@example.test" in ratelimit._attempts
+
+    # The opportunistic sweep runs at least once per GC interval, even if this
+    # particular expired key is never requested again.
+    now[0] += ratelimit._GC_INTERVAL_SECONDS + 1
+    ratelimit.check_rate_limit("ip:next-peer", 2, 10)
+    assert "email:arbitrary@example.test" not in ratelimit._attempts

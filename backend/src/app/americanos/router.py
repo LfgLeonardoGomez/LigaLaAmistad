@@ -11,6 +11,7 @@ from pydantic import BeforeValidator
 from app.americanos import schemas as dto
 from app.americanos import service
 from app.auth.deps import get_current_admin
+from app.core.csrf import require_same_origin
 from app.database.session import SessionDep
 
 
@@ -49,7 +50,7 @@ class AmericanoRoute(APIRoute):
 
 router = APIRouter(
     prefix="/admin/americanos", tags=["americanos"], route_class=AmericanoRoute,
-    dependencies=[Depends(get_current_admin)],
+    dependencies=[Depends(get_current_admin), Depends(require_same_origin)],
 )
 
 
@@ -167,3 +168,10 @@ def save_knockout(
     event_id: PathId, node_id: PathId, data: dto.SaveKnockoutRequest, session: SessionDep,
 ) -> dto.PlayoffsResponse:
     return service.save_knockout(session, event_id, node_id, data)
+
+
+@router.put("/{event_id}/playoffs/{node_id}/court")
+def assign_knockout_court(
+    event_id: PathId, node_id: PathId, data: dto.AssignKnockoutCourtRequest, session: SessionDep,
+) -> dto.PlayoffsResponse:
+    return service.assign_knockout_court(session, event_id, node_id, data)

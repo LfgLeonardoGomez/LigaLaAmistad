@@ -1,6 +1,4 @@
-"""Closed transport DTOs for the Americano shared contract v2.0.0.
-
-Transport shapes are unchanged by the v2.0.0 frontend component contract delta.
+"""Closed transport DTOs, including real-court selection and match assignments.
 
 No persistence/domain imports: event membership, complete stored match/seed sets,
 state transitions and approved terminal set rules belong to the service layer.
@@ -36,7 +34,20 @@ PositiveInt = Annotated[int, Field(strict=True, ge=1)]
 NonNegativeInt = Annotated[int, Field(strict=True, ge=0)]
 AmericanoId = Annotated[int, Field(strict=True, ge=1, le=9_007_199_254_740_991)]
 GroupGames = Annotated[int, Field(strict=True, ge=0, le=9)]
+CourtNumber = Annotated[int, Field(strict=True, ge=1, le=6)]
+
+
+def _unique_courts(values: list[int]) -> list[int]:
+    if len(values) != len(set(values)):
+        raise ValueError("Duplicate courts")
+    return sorted(values)
+
+
+Courts = Annotated[list[CourtNumber], Field(min_length=1, max_length=6), AfterValidator(_unique_courts)]
 StrictInt = Annotated[int, Field(strict=True)]
+# Bound one bulk write's ORM/SQL workload without imposing a total event-size
+# limit. Larger imports can be submitted as multiple revisioned requests.
+MAX_BULK_REGISTRATIONS = 25
 
 
 def _uuid_string(value: str) -> str:
@@ -86,6 +97,7 @@ class CreateEventRequest(ContractModel):
     name: Name
     zone_count: ZoneCount
     start_stage: StartStage
+    courts: Courts = Field(default_factory=lambda: [1, 2, 3, 4, 5, 6])
 
 
 class _PatchRequest(RevisionRequest):
@@ -101,6 +113,7 @@ class UpdateEventRequest(_PatchRequest):
     name: Name | None = None
     zone_count: ZoneCount | None = None
     start_stage: StartStage | None = None
+    courts: Courts | None = None
 
 
 class RegistrationRequest(RevisionRequest):
@@ -113,8 +126,14 @@ class RegistrationInput(ContractModel):
     player2_name: Name
 
 
+# This is a per-request transport ceiling, not a total event-participant cap.
+# Other context-dependent request arrays (zone selection, round results, and
+# tie resolutions) remain unbounded pending workload measurements and
+# load-tested limits.
 class BulkRegistrationRequest(RevisionRequest):
-    registrations: list[RegistrationInput] = Field(min_length=2)
+    registrations: list[RegistrationInput] = Field(
+        min_length=2, max_length=MAX_BULK_REGISTRATIONS,
+    )
 
 
 class UpdateRegistrationRequest(_PatchRequest):
@@ -184,6 +203,10 @@ class SaveKnockoutRequest(RevisionRequest):
         return self
 
 
+class AssignKnockoutCourtRequest(RevisionRequest):
+    court_number: CourtNumber
+
+
 class Zone(ContractModel):
     id: AmericanoId
     label: ZoneLabel
@@ -226,6 +249,7 @@ class EventSummary(ContractModel):
     state: EventState
     zone_count: ZoneCount
     start_stage: StartStage
+    courts: Courts
     revision: PositiveInt
     groups_revision: NonNegativeInt
     registration_count: NonNegativeInt
@@ -233,6 +257,7 @@ class EventSummary(ContractModel):
     saved_rounds: NonNegativeInt
     max_unlocked_round: NonNegativeInt
     continuation: Continuation
+    champion: Registration | None
 
 
 class ZoneQuota(ContractModel):
@@ -277,6 +302,7 @@ class GroupMatch(GroupScore):
     id: AmericanoId
     zone_id: AmericanoId
     display_order: PositiveInt
+    court_number: CourtNumber | None
     registration_a: Registration
     registration_b: Registration
 
@@ -463,6 +489,7 @@ class KnockoutNode(KnockoutScore):
     id: AmericanoId
     stage: StartStage
     slot: PositiveInt
+    court_number: CourtNumber | None
     registration_a: Registration | None
     registration_b: Registration | None
     next_match_id: AmericanoId | None
@@ -488,6 +515,7 @@ class PlayoffsResponse(ContractModel):
     revision: PositiveInt
     groups_revision: NonNegativeInt
     start_stage: StartStage
+    courts: Courts
     zones: list[Zone]
     snapshots: list[QualifierSnapshot]
     nodes: list[KnockoutNode]

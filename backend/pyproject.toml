@@ -13,7 +13,8 @@ dependencies = [
     "cloudinary>=1.45.0",
     "fastapi[standard]>=0.141.1",
     "psycopg[binary]>=3.3.4",
-    "pyjwt>=2.13.0",
+    "pyjwt>=2.15.0",
+    "certifi>=2026.10.19",
     "sqlmodel>=0.0.39",
 ]
 

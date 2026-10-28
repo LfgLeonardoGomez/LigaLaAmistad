@@ -10,7 +10,7 @@ import enum
 
 from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKeyConstraint, Index
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import UniqueConstraint, column
 from sqlmodel import Field
 
 from app.core.models import TimestampMixin
@@ -53,12 +53,18 @@ def _enum_column(
             members,
             name=name,
             native_enum=False,
-            create_constraint=True,
+            create_constraint=False,
             values_callable=lambda values: [member.value for member in values],
         ),
         nullable=nullable,
         default=default,
     )
+
+
+def _enum_check(members: type[enum.Enum], field: str, name: str) -> CheckConstraint:
+    # Explicit CHECKs preserve the existing DDL and remain visible to Alembic's
+    # check-constraint comparison (type-bound Enum helpers are excluded there).
+    return CheckConstraint(column(field).in_([member.value for member in members]), name=name)
 
 
 def _event_fk(table: str) -> ForeignKeyConstraint:
@@ -80,8 +86,11 @@ def _scoped_fk(table: str, field: str, target: str) -> ForeignKeyConstraint:
 class AmericanoEvent(TimestampMixin, table=True):
     __tablename__ = "americano_events"
     __table_args__ = (
+        _enum_check(AmericanoEventState, "state", "ck_americano_events_state"),
+        _enum_check(AmericanoStage, "start_stage", "ck_americano_events_start_stage"),
         CheckConstraint("length(trim(name)) > 0", name="ck_americano_events_name"),
         CheckConstraint("zone_count IN (1, 2)", name="ck_americano_events_zone_count"),
+        CheckConstraint("court_mask BETWEEN 1 AND 63", name="ck_americano_events_courts"),
         CheckConstraint("revision >= 1", name="ck_americano_events_revision"),
         CheckConstraint("groups_revision >= 0", name="ck_americano_events_groups_revision"),
         CheckConstraint(
@@ -110,6 +119,7 @@ class AmericanoEvent(TimestampMixin, table=True):
         ),
     )
     zone_count: int
+    court_mask: int = Field(default=63)
     start_stage: AmericanoStage = Field(
         sa_column=_enum_column(AmericanoStage, "ck_americano_events_start_stage"),
     )
@@ -127,6 +137,7 @@ class AmericanoEvent(TimestampMixin, table=True):
 class AmericanoZone(TimestampMixin, table=True):
     __tablename__ = "americano_zones"
     __table_args__ = (
+        _enum_check(AmericanoZoneLabel, "label", "ck_americano_zones_label"),
         _event_fk("zones"),
         UniqueConstraint("event_id", "id", name="uq_americano_zones_event_id"),
         UniqueConstraint("event_id", "label", name="uq_americano_zones_label"),
@@ -190,6 +201,8 @@ class AmericanoGroupMatch(TimestampMixin, table=True):
             name="uq_americano_group_matches_pair",
         ),
         UniqueConstraint("round_id", "display_order", name="uq_americano_group_matches_order"),
+        UniqueConstraint("round_id", "court_number", name="uq_americano_group_matches_court"),
+        CheckConstraint("court_number BETWEEN 1 AND 6", name="ck_americano_group_matches_court"),
         CheckConstraint(
             "registration_a_id < registration_b_id",
             name="ck_americano_group_matches_canonical_pair",
@@ -212,6 +225,7 @@ class AmericanoGroupMatch(TimestampMixin, table=True):
     registration_a_id: int
     registration_b_id: int
     display_order: int
+    court_number: int | None = Field(default=None)
     games_a: int | None = Field(default=None)
     games_b: int | None = Field(default=None)
 
@@ -279,6 +293,8 @@ class AmericanoQualifierSnapshot(TimestampMixin, table=True):
 class AmericanoKnockoutMatch(TimestampMixin, table=True):
     __tablename__ = "americano_knockout_matches"
     __table_args__ = (
+        _enum_check(AmericanoStage, "stage", "ck_americano_knockout_matches_stage"),
+        _enum_check(AmericanoSide, "next_side", "ck_americano_knockout_matches_side"),
         _event_fk("knockout_matches"),
         _scoped_fk("knockout_matches", "registration_a_id", "registrations"),
         _scoped_fk("knockout_matches", "registration_b_id", "registrations"),
@@ -293,6 +309,7 @@ class AmericanoKnockoutMatch(TimestampMixin, table=True):
             name="uq_americano_knockout_matches_destination",
         ),
         CheckConstraint("slot >= 1", name="ck_americano_knockout_matches_slot"),
+        CheckConstraint("court_number BETWEEN 1 AND 6", name="ck_americano_knockout_matches_court"),
         CheckConstraint(
             "registration_a_id != registration_b_id",
             name="ck_americano_knockout_matches_distinct_pair",
@@ -322,6 +339,7 @@ class AmericanoKnockoutMatch(TimestampMixin, table=True):
         sa_column=_enum_column(AmericanoStage, "ck_americano_knockout_matches_stage"),
     )
     slot: int
+    court_number: int | None = Field(default=None)
     registration_a_id: int | None = Field(default=None)
     registration_b_id: int | None = Field(default=None)
     games_a: int | None = Field(default=None)
