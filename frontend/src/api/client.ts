@@ -45,10 +45,19 @@ function readDetail(body: unknown, fallback: string): string {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response
   try {
+    const method = (init.method ?? 'GET').toUpperCase()
+    const headers = new Headers(init.headers)
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+      // A custom header forces browser preflight; the API also checks both
+      // this marker and the exact Origin before accepting admin mutations.
+      headers.set('X-Requested-With', 'XMLHttpRequest')
+    }
+
     response = await fetch(`${BASE_URL}${path}`, {
       // The session lives in an httpOnly cookie, so every call must carry it.
       credentials: 'include',
       ...init,
+      headers,
     })
   } catch {
     throw new ApiError(0, 'No se pudo conectar con el servidor')
